@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: dx-connect-db
+    environment:
+      POSTGRES_USER: dxconnect
+      POSTGRES_PASSWORD: dxconnect_secret
+      POSTGRES_DB: dxconnect
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dxconnect -d dxconnect"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dx-connect-api
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql://dxconnect:dxconnect_secret@db:5432/dxconnect
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend/app:/app/app
+
+volumes:
+  postgres_data:

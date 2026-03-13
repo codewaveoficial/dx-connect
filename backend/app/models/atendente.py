@@ -1,0 +1,40 @@
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Table, ForeignKey
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
+from app.database import Base
+
+# Tabela associativa: atendente <-> setor (N:N)
+atendente_setor = Table(
+    "atendente_setor",
+    Base.metadata,
+    Column("atendente_id", Integer, ForeignKey("atendentes.id", ondelete="CASCADE"), primary_key=True),
+    Column("setor_id", Integer, ForeignKey("setores.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
+class Atendente(Base):
+    """Usuário interno: admin ou atendente. Atendente vê apenas tickets do(s) seu(s) setor(es)."""
+
+    __tablename__ = "atendentes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    senha_hash = Column(String(255), nullable=False)
+    nome = Column(String(255), nullable=False)
+    role = Column(String(20), nullable=False, default="atendente")  # admin | atendente
+    ativo = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    setores = relationship(
+        "Setor",
+        secondary=atendente_setor,
+        back_populates="atendentes",
+    )
+    tickets_atendidos = relationship("Ticket", back_populates="atendente")
+    historicos = relationship("TicketHistorico", back_populates="atendente")
+
+
+# Alias para uso nos models (Setor usa "atendente_setor" como secondary string)
+AtendenteSetor = atendente_setor

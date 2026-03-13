@@ -1,0 +1,42 @@
+from pydantic import BaseModel, EmailStr
+from datetime import datetime
+
+
+class FuncionarioRedeBase(BaseModel):
+    nome: str
+    email: EmailStr
+    tipo: str  # socio | supervisor | colaborador
+    ativo: bool = True
+
+
+class FuncionarioRedeCreate(FuncionarioRedeBase):
+    rede_id: int | None = None      # obrigatório se tipo == socio
+    empresa_id: int | None = None   # obrigatório se tipo == colaborador
+    empresa_ids: list[int] = []     # obrigatório se tipo == supervisor
+
+
+class FuncionarioRedeUpdate(BaseModel):
+    nome: str | None = None
+    email: EmailStr | None = None
+    tipo: str | None = None
+    ativo: bool | None = None
+    rede_id: int | None = None
+    empresa_id: int | None = None
+    empresa_ids: list[int] | None = None
+
+
+class FuncionarioRedeRead(FuncionarioRedeBase):
+    id: int
+    rede_id: int | None = None
+    empresa_id: int | None = None
+    empresa_ids: list[int] = []
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class FuncionarioRedeComVinculo(FuncionarioRedeRead):
+    """Funcionário com texto 'vinculado a' (para exibição na tela da rede)."""
+    vinculado_a: str = ""
