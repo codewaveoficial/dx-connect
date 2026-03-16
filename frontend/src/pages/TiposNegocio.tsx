@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { redes } from '../api/client'
+import { tiposNegocio } from '../api/client'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -9,10 +8,9 @@ import { IconTrash } from '../components/ui/IconTrash'
 import { useToast } from '../components/ui/Toast'
 import { FiltroInativos } from '../components/ui/FiltroInativos'
 
-export function Redes() {
-  const navigate = useNavigate()
+export function TiposNegocio() {
   const toast = useToast()
-  const [list, setList] = useState<Awaited<ReturnType<typeof redes.list>>>([])
+  const [list, setList] = useState<Awaited<ReturnType<typeof tiposNegocio.list>>>([])
   const [loading, setLoading] = useState(true)
   const [incluirInativos, setIncluirInativos] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
@@ -24,7 +22,7 @@ export function Redes() {
 
   function load() {
     setLoading(true)
-    redes.list({ incluir_inativos: incluirInativos }).then(setList).finally(() => setLoading(false))
+    tiposNegocio.list({ incluir_inativos: incluirInativos }).then(setList).finally(() => setLoading(false))
   }
 
   useEffect(() => {
@@ -53,9 +51,9 @@ export function Redes() {
     setSaving(true)
     try {
       if (editingId) {
-        await redes.update(editingId, { nome: nome.trim(), ativo })
+        await tiposNegocio.update(editingId, { nome: nome.trim(), ativo })
       } else {
-        await redes.create({ nome: nome.trim(), ativo })
+        await tiposNegocio.create({ nome: nome.trim(), ativo })
       }
       setModalOpen(false)
       load()
@@ -67,9 +65,9 @@ export function Redes() {
   }
 
   async function handleDelete(id: number) {
-    if (!confirm('Excluir esta rede?')) return
+    if (!confirm('Excluir este tipo de negócio?')) return
     try {
-      await redes.delete(id)
+      await tiposNegocio.delete(id)
       load()
     } catch (err) {
       toast.showWarning(err instanceof Error ? err.message : 'Erro ao excluir')
@@ -79,8 +77,8 @@ export function Redes() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between">
-        <h1 className="text-2xl font-bold text-slate-800">Redes</h1>
-        <Button onClick={openCreate}>Nova rede</Button>
+        <h1 className="text-2xl font-bold text-slate-800">Tipos de negócio</h1>
+        <Button onClick={openCreate}>Novo tipo</Button>
       </div>
       <Card>
         <div className="mb-4 flex items-center justify-end">
@@ -89,29 +87,27 @@ export function Redes() {
         {loading ? (
           <p className="text-slate-500">Carregando...</p>
         ) : list.length === 0 ? (
-          <p className="text-slate-500">Nenhuma rede cadastrada.</p>
+          <p className="text-slate-500">Nenhum tipo cadastrado.</p>
         ) : (
           <ul className="divide-y divide-slate-200">
-            {list.map((r) => (
+            {list.map((t) => (
               <li
-                key={r.id}
+                key={t.id}
                 role="button"
                 tabIndex={0}
-                onClick={() => navigate(`/redes/${r.id}`)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/redes/${r.id}`); } }}
+                onClick={() => openEdit(t)}
+                onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openEdit(t); } }}
                 className="flex cursor-pointer items-center justify-between rounded-lg py-3 px-2 -mx-2 transition-colors duration-150 hover:bg-slate-50/80 focus:outline-none focus:bg-slate-50/80"
               >
                 <div className="flex min-w-0 items-center gap-2">
-                  <span className={`truncate font-medium ${r.ativo ? 'text-slate-800' : 'text-slate-400'}`}>
-                    {r.nome}
-                  </span>
-                  {!r.ativo && <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600">Inativo</span>}
+                  <span className={`font-medium ${t.ativo ? 'text-slate-800' : 'text-slate-400'}`}>{t.nome}</span>
+                  {!t.ativo && <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600">Inativo</span>}
                 </div>
-                <div className="flex shrink-0 gap-1.5" onClick={(e) => e.stopPropagation()}>
-                  <Button variant="ghost" onClick={() => openEdit(r)} aria-label="Editar rede">
+                <div className="flex shrink-0 gap-1.5" onClick={(ev) => ev.stopPropagation()}>
+                  <Button variant="ghost" onClick={() => openEdit(t)} aria-label="Editar">
                     <IconPencil ariaHidden={false} />
                   </Button>
-                  <Button variant="ghost" onClick={() => handleDelete(r.id)} aria-label="Excluir rede">
+                  <Button variant="ghost" onClick={() => handleDelete(t.id)} aria-label="Excluir">
                     <IconTrash ariaHidden={false} />
                   </Button>
                 </div>
@@ -123,7 +119,7 @@ export function Redes() {
 
       {modalOpen && (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4">
-          <Card title={editingId ? 'Editar rede' : 'Nova rede'} className="w-full max-w-md">
+          <Card title={editingId ? 'Editar tipo' : 'Novo tipo de negócio'} className="w-full max-w-md">
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && <div className="rounded bg-red-50 p-2 text-sm text-red-700">{error}</div>}
               <Input label="Nome" value={nome} onChange={(e) => setNome(e.target.value)} required />

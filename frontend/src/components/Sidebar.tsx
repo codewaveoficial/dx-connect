@@ -123,7 +123,9 @@ const navStructure: NavItem[] = [
     children: [
       { to: '/setores', label: 'Setores', icon: 'setores' },
       { to: '/atendentes', label: 'Atendentes', icon: 'atendentes' },
+      { to: '/tipos-negocio', label: 'Tipos de negócio', icon: 'configuracoes' },
       { to: '/status-ticket', label: 'Status de ticket', icon: 'status' },
+      { to: '/auditoria', label: 'Auditoria', icon: 'configuracoes' },
     ],
   },
 ]

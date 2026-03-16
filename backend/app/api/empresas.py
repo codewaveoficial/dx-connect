@@ -1,11 +1,17 @@
+import re
+import urllib.request
+import urllib.error
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Empresa, Rede
+from app.models import Empresa, Rede, Ticket, FuncionarioRede, FuncionarioRedeEmpresa
 from app.models.atendente import Atendente
-from app.schemas.empresa import EmpresaCreate, EmpresaUpdate, EmpresaRead
+from app.schemas.empresa import EmpresaCreate, EmpresaUpdate, EmpresaRead, ConsultaCNPJResponse
 from app.core.auth import exigir_admin, obter_atendente_atual
+from app.core.audit import registrar_audit
 
 router = APIRouter(prefix="/empresas", tags=["empresas"])
 
@@ -24,26 +30,100 @@ def _pode_ver_empresa(atendente: Atendente, empresa_id: int, db: Session) -> boo
 @router.get("", response_model=list[EmpresaRead])
 def listar_empresas(
     rede_id: int | None = Query(None),
+    incluir_inativos: bool = Query(False, description="Incluir empresas inativas"),
     db: Session = Depends(get_db),
     _: Atendente = Depends(obter_atendente_atual),
 ):
     q = db.query(Empresa).order_by(Empresa.nome)
     if rede_id is not None:
         q = q.filter(Empresa.rede_id == rede_id)
+    if not incluir_inativos:
+        q = q.filter(Empresa.ativo.is_(True))
     return q.all()
+
+
+def _digitos(s: str) -> str:
+    return re.sub(r"\D", "", s) if s else ""
+
+
+@router.get("/consultar-cnpj/{cnpj}", response_model=ConsultaCNPJResponse)
+def consultar_cnpj(
+    cnpj: str,
+    _: Atendente = Depends(exigir_admin),
+):
+    """Consulta dados do CNPJ na ReceitaWS e retorna normalizado para preenchimento do formulário."""
+    digits = _digitos(cnpj)
+    if len(digits) != 14:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CNPJ deve conter 14 dígitos.",
+        )
+    url = f"https://www.receitaws.com.br/v1/cnpj/{digits}"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "DX-Connect/1.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Limite de consultas excedido. Tente novamente em alguns minutos.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Serviço de consulta CNPJ indisponível.",
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Erro ao consultar CNPJ.",
+        )
+    if data.get("status") == "ERROR":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=data.get("message", "CNPJ não encontrado."),
+        )
+    logradouro = data.get("logradouro") or ""
+    numero = data.get("numero") or ""
+    complemento = data.get("complemento") or ""
+    parts = [logradouro, numero, complemento]
+    endereco = ", ".join(p for p in parts if p.strip())
+    atv = data.get("atividade_principal")
+    atividade_principal = atv[0].get("text") if isinstance(atv, list) and atv else None
+    return ConsultaCNPJResponse(
+        cnpj=data.get("cnpj", digits),
+        razao_social=data.get("nome") or "",
+        nome_fantasia=data.get("fantasia") or None,
+        situacao=data.get("situacao"),
+        endereco=endereco,
+        numero=data.get("numero") or None,
+        complemento=data.get("complemento") or None,
+        bairro=data.get("bairro") or None,
+        cidade=data.get("municipio") or None,
+        estado=data.get("uf") or None,
+        cep=data.get("cep") or None,
+        email=data.get("email") or None,
+        telefone=data.get("telefone") or None,
+        abertura=data.get("abertura"),
+        natureza_juridica=data.get("natureza_juridica"),
+        atividade_principal=atividade_principal,
+    )
 
 
 @router.post("", response_model=EmpresaRead, status_code=201)
 def criar_empresa(
     data: EmpresaCreate,
     db: Session = Depends(get_db),
-    _: Atendente = Depends(exigir_admin),
+    atendente: Atendente = Depends(exigir_admin),
 ):
     rede = db.query(Rede).filter(Rede.id == data.rede_id).first()
     if not rede:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rede não encontrada")
-    empresa = Empresa(**data.model_dump())
+    payload = data.model_dump()
+    empresa = Empresa(**payload)
     db.add(empresa)
+    db.flush()
+    registrar_audit(db, "empresa", empresa.id, "create", atendente.id)
     db.commit()
     db.refresh(empresa)
     return empresa
@@ -66,13 +146,14 @@ def atualizar_empresa(
     empresa_id: int,
     data: EmpresaUpdate,
     db: Session = Depends(get_db),
-    _: Atendente = Depends(exigir_admin),
+    atendente: Atendente = Depends(exigir_admin),
 ):
     empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
     if not empresa:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Empresa não encontrada")
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(empresa, k, v)
+    registrar_audit(db, "empresa", empresa_id, "update", atendente.id)
     db.commit()
     db.refresh(empresa)
     return empresa
@@ -87,5 +168,18 @@ def excluir_empresa(
     empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
     if not empresa:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Empresa não encontrada")
+    tickets_count = db.query(Ticket).filter(Ticket.empresa_id == empresa_id).count()
+    if tickets_count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Não é possível excluir uma empresa que possua tickets vinculados. Resolva ou transfira os tickets antes. Sugere-se inativar o registro.",
+        )
+    colaboradores_count = db.query(FuncionarioRede).filter(FuncionarioRede.empresa_id == empresa_id).count()
+    supervisores_count = db.query(FuncionarioRedeEmpresa).filter(FuncionarioRedeEmpresa.empresa_id == empresa_id).count()
+    if colaboradores_count > 0 or supervisores_count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Não é possível excluir uma empresa que possua funcionários vinculados (colaboradores ou supervisores). Remova ou transfira os vínculos antes. Sugere-se inativar o registro.",
+        )
     db.delete(empresa)
     db.commit()

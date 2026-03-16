@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 
 from app.database import get_db
@@ -8,26 +8,33 @@ from app.models.atendente import Atendente
 from app.schemas.rede import RedeCreate, RedeUpdate, RedeRead
 from app.schemas.funcionario_rede import FuncionarioRedeComVinculo
 from app.core.auth import obter_atendente_atual, exigir_admin
+from app.core.audit import registrar_audit
 
 router = APIRouter(prefix="/redes", tags=["redes"])
 
 
 @router.get("", response_model=list[RedeRead])
 def listar_redes(
+    incluir_inativos: bool = Query(False, description="Incluir redes inativas"),
     db: Session = Depends(get_db),
     _: Atendente = Depends(exigir_admin),
 ):
-    return db.query(Rede).order_by(Rede.nome).all()
+    q = db.query(Rede).order_by(Rede.nome)
+    if not incluir_inativos:
+        q = q.filter(Rede.ativo.is_(True))
+    return q.all()
 
 
 @router.post("", response_model=RedeRead, status_code=201)
 def criar_rede(
     data: RedeCreate,
     db: Session = Depends(get_db),
-    _: Atendente = Depends(exigir_admin),
+    atendente: Atendente = Depends(exigir_admin),
 ):
     rede = Rede(**data.model_dump())
     db.add(rede)
+    db.flush()
+    registrar_audit(db, "rede", rede.id, "create", atendente.id)
     db.commit()
     db.refresh(rede)
     return rede
@@ -36,6 +43,7 @@ def criar_rede(
 @router.get("/{rede_id}/funcionarios", response_model=list[FuncionarioRedeComVinculo])
 def listar_funcionarios_da_rede(
     rede_id: int,
+    incluir_inativos: bool = Query(False, description="Incluir funcionários inativos"),
     db: Session = Depends(get_db),
     _: Atendente = Depends(exigir_admin),
 ):
@@ -54,7 +62,14 @@ def listar_funcionarios_da_rede(
                 )
             )
         )
-    q = db.query(FuncionarioRede).filter(or_(*condicoes)).order_by(FuncionarioRede.nome)
+    q = (
+        db.query(FuncionarioRede)
+        .options(joinedload(FuncionarioRede.empresas_supervisor).joinedload(FuncionarioRedeEmpresa.empresa))
+        .filter(or_(*condicoes))
+        .order_by(FuncionarioRede.nome)
+    )
+    if not incluir_inativos:
+        q = q.filter(FuncionarioRede.ativo.is_(True))
     result = []
     for f in q.all():
         if f.tipo == "socio":
@@ -106,13 +121,14 @@ def atualizar_rede(
     rede_id: int,
     data: RedeUpdate,
     db: Session = Depends(get_db),
-    _: Atendente = Depends(exigir_admin),
+    atendente: Atendente = Depends(exigir_admin),
 ):
     rede = db.query(Rede).filter(Rede.id == rede_id).first()
     if not rede:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rede não encontrada")
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(rede, k, v)
+    registrar_audit(db, "rede", rede_id, "update", atendente.id)
     db.commit()
     db.refresh(rede)
     return rede
@@ -127,5 +143,11 @@ def excluir_rede(
     rede = db.query(Rede).filter(Rede.id == rede_id).first()
     if not rede:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rede não encontrada")
+    empresas_na_rede = db.query(Empresa).filter(Empresa.rede_id == rede_id).count()
+    if empresas_na_rede > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Não é possível excluir uma rede que possua empresas ativas. Remova ou transfira as empresas antes. Sugere-se inativar o registro.",
+        )
     db.delete(rede)
     db.commit()

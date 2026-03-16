@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { tickets, statusTicket, type Tickets } from '../api/client'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { IconEye } from '../components/ui/IconEye'
 
 export function Tickets() {
+  const navigate = useNavigate()
   const [list, setList] = useState<Tickets.Ticket[]>([])
   const [loading, setLoading] = useState(true)
   const [filtroProtocolo, setFiltroProtocolo] = useState('')
@@ -80,23 +81,30 @@ export function Tickets() {
               </thead>
               <tbody>
                 {list.map((t) => (
-                  <tr key={t.id} className="border-b border-slate-100">
+                  <tr
+                    key={t.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => navigate(`/tickets/${t.id}`)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/tickets/${t.id}`); } }}
+                    className="cursor-pointer border-b border-slate-100 transition-colors duration-150 hover:bg-slate-50/80 focus:outline-none focus:bg-slate-50/80"
+                  >
                     <td className="py-3 pr-4 font-mono text-slate-800">{t.protocolo}</td>
                     <td className="py-3 pr-4">{t.empresa_nome ?? t.empresa_id}</td>
                     <td className="py-3 pr-4">{t.setor_nome ?? t.setor_id}</td>
-                    <td className="py-3 pr-4">{t.assunto}</td>
+                    <td className="py-3 pr-4 font-medium text-slate-800">{t.assunto}</td>
                     <td className="py-3 pr-4">{t.status_nome ?? t.status_id}</td>
                     <td className="py-3 pr-4">{t.atendente_nome ?? '—'}</td>
-                    <td className="py-3">
-                      <Link to={`/tickets/${t.id}`} aria-label="Ver ticket">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-900"
-                        >
-                          <IconEye ariaHidden={false} />
-                        </Button>
-                      </Link>
+                    <td className="py-3" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-900"
+                        onClick={() => navigate(`/tickets/${t.id}`)}
+                        aria-label="Ver ticket"
+                      >
+                        <IconEye ariaHidden={false} />
+                      </Button>
                     </td>
                   </tr>
                 ))}

@@ -1,14 +1,17 @@
 from app.models.rede import Rede
 from app.models.empresa import Empresa
+from app.models.tipo_negocio import TipoNegocio
 from app.models.atendente import Atendente, AtendenteSetor
 from app.models.setor import Setor
 from app.models.funcionario_rede import FuncionarioRede, FuncionarioRedeEmpresa
 from app.models.status_ticket import StatusTicket
 from app.models.ticket import Ticket, TicketHistorico
+from app.models.audit_log import AuditLog
 
 __all__ = [
     "Rede",
     "Empresa",
+    "TipoNegocio",
     "Setor",
     "Atendente",
     "AtendenteSetor",
@@ -17,4 +20,5 @@ __all__ = [
     "StatusTicket",
     "Ticket",
     "TicketHistorico",
+    "AuditLog",
 ]

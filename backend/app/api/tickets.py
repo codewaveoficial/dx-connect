@@ -107,6 +107,15 @@ def criar(
     return _ticket_para_read(ticket)
 
 
+@router.delete("/{ticket_id}")
+def excluir_nao_permitido(ticket_id: int):
+    """Tickets não podem ser excluídos; use alteração de status (ex.: fechado) conforme regra de negócio."""
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Tickets não podem ser excluídos. Para encerrar, altere o status do ticket (ex.: Fechado).",
+    )
+
+
 @router.get("/{ticket_id}", response_model=TicketRead)
 def obter(
     ticket_id: int,

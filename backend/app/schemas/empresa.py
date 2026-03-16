@@ -4,7 +4,21 @@ from datetime import datetime
 
 class EmpresaBase(BaseModel):
     rede_id: int
+    tipo_negocio_id: int | None = None
     nome: str
+    cnpj_cpf: str | None = None
+    razao_social: str | None = None
+    nome_fantasia: str | None = None
+    inscricao_estadual: str | None = None
+    endereco: str | None = None
+    numero: str | None = None
+    complemento: str | None = None
+    bairro: str | None = None
+    cidade: str | None = None
+    estado: str | None = None
+    cep: str | None = None
+    email: str | None = None
+    telefone: str | None = None
     ativo: bool = True
 
 
@@ -14,7 +28,21 @@ class EmpresaCreate(EmpresaBase):
 
 class EmpresaUpdate(BaseModel):
     rede_id: int | None = None
+    tipo_negocio_id: int | None = None
     nome: str | None = None
+    cnpj_cpf: str | None = None
+    razao_social: str | None = None
+    nome_fantasia: str | None = None
+    inscricao_estadual: str | None = None
+    endereco: str | None = None
+    numero: str | None = None
+    complemento: str | None = None
+    bairro: str | None = None
+    cidade: str | None = None
+    estado: str | None = None
+    cep: str | None = None
+    email: str | None = None
+    telefone: str | None = None
     ativo: bool | None = None
 
 
@@ -25,3 +53,23 @@ class EmpresaRead(EmpresaBase):
 
     class Config:
         from_attributes = True
+
+
+class ConsultaCNPJResponse(BaseModel):
+    """Resposta normalizada da consulta ReceitaWS para preenchimento do formulário."""
+    cnpj: str
+    razao_social: str
+    nome_fantasia: str | None = None
+    situacao: str | None = None
+    endereco: str = ""
+    numero: str | None = None
+    complemento: str | None = None
+    bairro: str | None = None
+    cidade: str | None = None
+    estado: str | None = None
+    cep: str | None = None
+    email: str | None = None
+    telefone: str | None = None
+    abertura: str | None = None
+    natureza_juridica: str | None = None
+    atividade_principal: str | None = None

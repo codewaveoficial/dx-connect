@@ -4,30 +4,33 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { IconPencil } from '../components/ui/IconPencil'
+import { FiltroInativos } from '../components/ui/FiltroInativos'
 
 export function Atendentes() {
   const [list, setList] = useState<Awaited<ReturnType<typeof atendentes.list>>>([])
   const [setoresList, setSetoresList] = useState<Awaited<ReturnType<typeof setores.list>>>([])
   const [loading, setLoading] = useState(true)
+  const [incluirInativos, setIncluirInativos] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [email, setEmail] = useState('')
   const [nome, setNome] = useState('')
   const [senha, setSenha] = useState('')
   const [role, setRole] = useState<'admin' | 'atendente'>('atendente')
+  const [ativo, setAtivo] = useState(true)
   const [setorIds, setSetorIds] = useState<number[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   function load() {
     setLoading(true)
-    atendentes.list().then(setList).finally(() => setLoading(false))
+    atendentes.list({ incluir_inativos: incluirInativos }).then(setList).finally(() => setLoading(false))
   }
 
   useEffect(() => {
     load()
     setores.list().then(setSetoresList)
-  }, [])
+  }, [incluirInativos])
 
   function openCreate() {
     setEditingId(null)
@@ -35,6 +38,7 @@ export function Atendentes() {
     setNome('')
     setSenha('')
     setRole('atendente')
+    setAtivo(true)
     setSetorIds([])
     setError('')
     setModalOpen(true)
@@ -46,6 +50,7 @@ export function Atendentes() {
     setNome(item.nome)
     setSenha('')
     setRole((item.role as 'admin') || 'atendente')
+    setAtivo(item.ativo)
     setSetorIds(item.setor_ids ?? [])
     setError('')
     setModalOpen(true)
@@ -65,6 +70,7 @@ export function Atendentes() {
           email,
           nome: nome.trim(),
           role,
+          ativo,
           setor_ids: setorIds,
           ...(senha ? { senha } : {}),
         })
@@ -76,7 +82,7 @@ export function Atendentes() {
           senha,
           role,
           setor_ids: setorIds,
-          ativo: true,
+          ativo,
         })
       }
       setModalOpen(false)
@@ -95,6 +101,9 @@ export function Atendentes() {
         <Button onClick={openCreate}>Novo atendente</Button>
       </div>
       <Card>
+        <div className="mb-4 flex items-center justify-end">
+          <FiltroInativos incluirInativos={incluirInativos} onChange={setIncluirInativos} />
+        </div>
         {loading ? (
           <p className="text-slate-500">Carregando...</p>
         ) : list.length === 0 ? (
@@ -102,13 +111,23 @@ export function Atendentes() {
         ) : (
           <ul className="divide-y divide-slate-200">
             {list.map((a) => (
-              <li key={a.id} className="flex items-center justify-between py-3">
-                <div>
-                  <span className="font-medium">{a.nome}</span>
-                  <span className="ml-2 text-slate-500">{a.email}</span>
-                  <span className="ml-2 text-xs text-slate-400">({a.role})</span>
+              <li
+                key={a.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => openEdit(a)}
+                onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openEdit(a); } }}
+                className="flex cursor-pointer items-center justify-between rounded-lg py-3 px-2 -mx-2 transition-colors duration-150 hover:bg-slate-50/80 focus:outline-none focus:bg-slate-50/80"
+              >
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <span className={`font-medium ${a.ativo ? 'text-slate-800' : 'text-slate-400'}`}>{a.nome}</span>
+                  {!a.ativo && <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600">Inativo</span>}
+                  <span className="text-slate-500">{a.email}</span>
+                  <span className="text-xs text-slate-400">({a.role})</span>
                 </div>
-                <Button variant="ghost" onClick={() => openEdit(a)} aria-label="Editar"><IconPencil /></Button>
+                <div className="shrink-0" onClick={(ev) => ev.stopPropagation()}>
+                  <Button variant="ghost" onClick={() => openEdit(a)} aria-label="Editar"><IconPencil /></Button>
+                </div>
               </li>
             ))}
           </ul>
@@ -153,6 +172,10 @@ export function Atendentes() {
                   </div>
                 </div>
               )}
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} className="rounded border-slate-300" />
+                Ativo
+              </label>
               <div className="flex gap-2">
                 <Button type="submit" loading={saving}>Salvar</Button>
                 <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>Cancelar</Button>

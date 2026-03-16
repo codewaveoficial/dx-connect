@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -6,6 +6,7 @@ from app.models import Atendente, Setor
 from app.schemas.atendente import AtendenteCreate, AtendenteRead, AtendenteUpdate
 from app.core.auth import exigir_admin, obter_atendente_atual
 from app.core.security import hash_senha
+from app.core.audit import registrar_audit
 
 router = APIRouter(prefix="/atendentes", tags=["atendentes"])
 
@@ -25,18 +26,21 @@ def _atendente_para_read(atendente: Atendente) -> AtendenteRead:
 
 @router.get("", response_model=list[AtendenteRead])
 def listar_atendentes(
+    incluir_inativos: bool = Query(False, description="Incluir atendentes inativos"),
     db: Session = Depends(get_db),
     _: Atendente = Depends(exigir_admin),
 ):
-    atendentes = db.query(Atendente).order_by(Atendente.nome).all()
-    return [_atendente_para_read(a) for a in atendentes]
+    q = db.query(Atendente).order_by(Atendente.nome)
+    if not incluir_inativos:
+        q = q.filter(Atendente.ativo.is_(True))
+    return [_atendente_para_read(a) for a in q.all()]
 
 
 @router.post("", response_model=AtendenteRead, status_code=201)
 def criar_atendente(
     data: AtendenteCreate,
     db: Session = Depends(get_db),
-    _: Atendente = Depends(exigir_admin),
+    atendente_logado: Atendente = Depends(exigir_admin),
 ):
     if db.query(Atendente).filter(Atendente.email == data.email).first():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="E-mail já cadastrado")
@@ -49,6 +53,7 @@ def criar_atendente(
     )
     db.add(atendente)
     db.flush()
+    registrar_audit(db, "atendente", atendente.id, "create", atendente_logado.id)
     for setor_id in data.setor_ids:
         setor = db.query(Setor).filter(Setor.id == setor_id).first()
         if setor:
@@ -80,7 +85,7 @@ def atualizar_atendente(
     atendente_id: int,
     data: AtendenteUpdate,
     db: Session = Depends(get_db),
-    _: Atendente = Depends(exigir_admin),
+    atendente_logado: Atendente = Depends(exigir_admin),
 ):
     atendente = db.query(Atendente).filter(Atendente.id == atendente_id).first()
     if not atendente:
@@ -97,6 +102,7 @@ def atualizar_atendente(
                 atendente.setores.append(setor)
     for k, v in update.items():
         setattr(atendente, k, v)
+    registrar_audit(db, "atendente", atendente_id, "update", atendente_logado.id)
     db.commit()
     db.refresh(atendente)
     return _atendente_para_read(atendente)

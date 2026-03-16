@@ -13,6 +13,8 @@ import { Setores } from './pages/Setores'
 import { Atendentes } from './pages/Atendentes'
 import { FuncionariosRede } from './pages/FuncionariosRede'
 import { StatusTicketPage } from './pages/StatusTicket'
+import { Auditoria } from './pages/Auditoria'
+import { TiposNegocio } from './pages/TiposNegocio'
 import { ToastProvider } from './components/ui/Toast'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -43,6 +45,7 @@ function AppRoutes() {
         }
       >
         <Route index element={<Dashboard />} />
+        <Route path="tickets" element={<Tickets />} />
         <Route path="tickets/novo" element={<TicketNovo />} />
         <Route path="tickets/:id" element={<TicketDetalhe />} />
         <Route path="redes/:id" element={<RedeDetalhe />} />
@@ -52,6 +55,8 @@ function AppRoutes() {
         <Route path="atendentes" element={<Atendentes />} />
         <Route path="funcionarios-rede" element={<FuncionariosRede />} />
         <Route path="status-ticket" element={<StatusTicketPage />} />
+        <Route path="auditoria" element={<Auditoria />} />
+        <Route path="tipos-negocio" element={<TiposNegocio />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

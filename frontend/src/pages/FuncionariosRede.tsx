@@ -6,21 +6,26 @@ import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { IconPencil } from '../components/ui/IconPencil'
 import { IconTrash } from '../components/ui/IconTrash'
+import { useToast } from '../components/ui/Toast'
+import { FiltroInativos } from '../components/ui/FiltroInativos'
 
 type Tipo = 'socio' | 'supervisor' | 'colaborador'
 
 export function FuncionariosRede() {
   const location = useLocation()
   const navigate = useNavigate()
+  const toast = useToast()
   const [list, setList] = useState<Awaited<ReturnType<typeof funcionariosRede.list>>>([])
   const [redesList, setRedesList] = useState<Awaited<ReturnType<typeof redes.list>>>([])
   const [empresasList, setEmpresasList] = useState<Awaited<ReturnType<typeof empresas.list>>>([])
   const [loading, setLoading] = useState(true)
+  const [incluirInativos, setIncluirInativos] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
   const [tipo, setTipo] = useState<Tipo>('colaborador')
+  const [ativo, setAtivo] = useState(true)
   const [redeId, setRedeId] = useState<number | ''>('')
   const [empresaId, setEmpresaId] = useState<number | ''>('')
   const [empresaIds, setEmpresaIds] = useState<number[]>([])
@@ -29,14 +34,14 @@ export function FuncionariosRede() {
 
   function load() {
     setLoading(true)
-    funcionariosRede.list().then(setList).finally(() => setLoading(false))
+    funcionariosRede.list({ incluir_inativos: incluirInativos }).then(setList).finally(() => setLoading(false))
   }
 
   useEffect(() => {
     load()
     redes.list().then(setRedesList)
     empresas.list().then(setEmpresasList)
-  }, [])
+  }, [incluirInativos])
 
   useEffect(() => {
     const editId = (location.state as { editId?: number } | null)?.editId
@@ -52,6 +57,7 @@ export function FuncionariosRede() {
     setNome('')
     setEmail('')
     setTipo('colaborador')
+    setAtivo(true)
     setRedeId('')
     setEmpresaId('')
     setEmpresaIds([])
@@ -64,6 +70,7 @@ export function FuncionariosRede() {
     setNome(item.nome)
     setEmail(item.email)
     setTipo(item.tipo as Tipo)
+    setAtivo(item.ativo)
     setRedeId(item.rede_id ?? '')
     setEmpresaId(item.empresa_id ?? '')
     setEmpresaIds(item.empresa_ids ?? [])
@@ -84,7 +91,7 @@ export function FuncionariosRede() {
         nome: nome.trim(),
         email,
         tipo,
-        ativo: true,
+        ativo,
         rede_id: tipo === 'socio' ? Number(redeId) : undefined,
         empresa_id: tipo === 'colaborador' ? Number(empresaId) : undefined,
         empresa_ids: tipo === 'supervisor' ? empresaIds : undefined,
@@ -109,7 +116,7 @@ export function FuncionariosRede() {
       await funcionariosRede.delete(id)
       load()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Erro ao excluir')
+      toast.showWarning(err instanceof Error ? err.message : 'Erro ao excluir')
     }
   }
 
@@ -119,9 +126,74 @@ export function FuncionariosRede() {
     <div className="space-y-6">
       <div className="flex justify-between">
         <h1 className="text-2xl font-bold text-slate-800">Funcionários da rede</h1>
-        <Button onClick={openCreate}>Novo</Button>
+        <Button onClick={openCreate} disabled={modalOpen}>Novo</Button>
       </div>
+
+      {modalOpen && (
+        <Card title={editingId ? 'Editar funcionário' : 'Novo funcionário'}>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && <div className="rounded bg-red-50 p-2 text-sm text-red-700">{error}</div>}
+            <Input label="Nome" value={nome} onChange={(e) => setNome(e.target.value)} required />
+            <Input label="E-mail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Tipo</label>
+              <select value={tipo} onChange={(e) => setTipo(e.target.value as Tipo)} className="w-full rounded-lg border border-slate-300 px-3 py-2">
+                <option value="socio">Sócio</option>
+                <option value="supervisor">Supervisor</option>
+                <option value="colaborador">Colaborador</option>
+              </select>
+            </div>
+            {tipo === 'socio' && (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Rede</label>
+                <select value={redeId} onChange={(e) => setRedeId(Number(e.target.value))} required className="w-full rounded-lg border border-slate-300 px-3 py-2">
+                  <option value="">Selecione</option>
+                  {redesList.map((r) => (
+                    <option key={r.id} value={r.id}>{r.nome}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {tipo === 'colaborador' && (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Empresa</label>
+                <select value={empresaId} onChange={(e) => setEmpresaId(Number(e.target.value))} required className="w-full rounded-lg border border-slate-300 px-3 py-2">
+                  <option value="">Selecione</option>
+                  {empresasList.map((e) => (
+                    <option key={e.id} value={e.id}>{e.nome}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {tipo === 'supervisor' && (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Empresas</label>
+                <div className="flex flex-wrap gap-2">
+                  {empresasList.map((e) => (
+                    <label key={e.id} className="flex items-center gap-2">
+                      <input type="checkbox" checked={empresaIds.includes(e.id)} onChange={() => toggleEmpresa(e.id)} />
+                      <span>{e.nome}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} className="rounded border-slate-300" />
+              Ativo
+            </label>
+            <div className="flex gap-2 pt-2 border-t border-slate-200">
+              <Button type="submit" loading={saving}>Salvar</Button>
+              <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>Cancelar</Button>
+            </div>
+          </form>
+        </Card>
+      )}
+
       <Card>
+        <div className="mb-4 flex items-center justify-end">
+          <FiltroInativos incluirInativos={incluirInativos} onChange={setIncluirInativos} />
+        </div>
         {loading ? (
           <p className="text-slate-500">Carregando...</p>
         ) : list.length === 0 ? (
@@ -129,13 +201,21 @@ export function FuncionariosRede() {
         ) : (
           <ul className="divide-y divide-slate-200">
             {list.map((f) => (
-              <li key={f.id} className="flex items-center justify-between py-3">
-                <div>
-                  <span className="font-medium">{f.nome}</span>
-                  <span className="ml-2 text-slate-500">{f.email}</span>
-                  <span className="ml-2 text-xs text-slate-400">({tipoLabel[f.tipo as Tipo]})</span>
+              <li
+                key={f.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => openEdit(f)}
+                onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openEdit(f); } }}
+                className="flex cursor-pointer items-center justify-between rounded-lg py-3 px-2 -mx-2 transition-colors duration-150 hover:bg-slate-50/80 focus:outline-none focus:bg-slate-50/80"
+              >
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <span className={`font-medium ${f.ativo ? 'text-slate-800' : 'text-slate-400'}`}>{f.nome}</span>
+                  {!f.ativo && <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600">Inativo</span>}
+                  <span className="text-slate-500">{f.email}</span>
+                  <span className="text-xs text-slate-400">({tipoLabel[f.tipo as Tipo]})</span>
                 </div>
-                <div className="flex gap-1.5">
+                <div className="flex shrink-0 gap-1.5" onClick={(ev) => ev.stopPropagation()}>
                   <Button variant="ghost" onClick={() => openEdit(f)} aria-label="Editar funcionário">
                     <IconPencil ariaHidden={false} />
                   </Button>
@@ -148,65 +228,6 @@ export function FuncionariosRede() {
           </ul>
         )}
       </Card>
-
-      {modalOpen && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4">
-          <Card title={editingId ? 'Editar' : 'Novo funcionário'} className="w-full max-w-md">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && <div className="rounded bg-red-50 p-2 text-sm text-red-700">{error}</div>}
-              <Input label="Nome" value={nome} onChange={(e) => setNome(e.target.value)} required />
-              <Input label="E-mail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Tipo</label>
-                <select value={tipo} onChange={(e) => setTipo(e.target.value as Tipo)} className="w-full rounded-lg border border-slate-300 px-3 py-2">
-                  <option value="socio">Sócio</option>
-                  <option value="supervisor">Supervisor</option>
-                  <option value="colaborador">Colaborador</option>
-                </select>
-              </div>
-              {tipo === 'socio' && (
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Rede</label>
-                  <select value={redeId} onChange={(e) => setRedeId(Number(e.target.value))} required className="w-full rounded-lg border border-slate-300 px-3 py-2">
-                    <option value="">Selecione</option>
-                    {redesList.map((r) => (
-                      <option key={r.id} value={r.id}>{r.nome}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              {tipo === 'colaborador' && (
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Empresa</label>
-                  <select value={empresaId} onChange={(e) => setEmpresaId(Number(e.target.value))} required className="w-full rounded-lg border border-slate-300 px-3 py-2">
-                    <option value="">Selecione</option>
-                    {empresasList.map((e) => (
-                      <option key={e.id} value={e.id}>{e.nome}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              {tipo === 'supervisor' && (
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Empresas</label>
-                  <div className="flex flex-wrap gap-2">
-                    {empresasList.map((e) => (
-                      <label key={e.id} className="flex items-center gap-2">
-                        <input type="checkbox" checked={empresaIds.includes(e.id)} onChange={() => toggleEmpresa(e.id)} />
-                        <span>{e.nome}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="flex gap-2">
-                <Button type="submit" loading={saving}>Salvar</Button>
-                <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>Cancelar</Button>
-              </div>
-            </form>
-          </Card>
-        </div>
-      )}
     </div>
   )
 }

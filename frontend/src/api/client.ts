@@ -48,25 +48,46 @@ export const auth = {
     }),
 };
 
+function withParams(path: string, params?: Record<string, string | number | boolean | undefined>) {
+  if (!params) return path;
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== '') q.set(k, String(v));
+  }
+  const s = q.toString();
+  return s ? `${path}?${s}` : path;
+}
+
 export const redes = {
-  list: () => api<Redes.Rede[]>('/redes'),
+  list: (params?: { incluir_inativos?: boolean }) => api<Redes.Rede[]>(withParams('/redes', params)),
   get: (id: number) => api<Redes.Rede>(`/redes/${id}`),
-  getFuncionarios: (redeId: number) => api<Redes.FuncionarioComVinculo[]>(`/redes/${redeId}/funcionarios`),
+  getFuncionarios: (redeId: number, params?: { incluir_inativos?: boolean }) =>
+    api<Redes.FuncionarioComVinculo[]>(withParams(`/redes/${redeId}/funcionarios`, params)),
   create: (data: Redes.Create) => api<Redes.Rede>('/redes', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: Redes.Update) => api<Redes.Rede>(`/redes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: number) => api<void>(`/redes/${id}`, { method: 'DELETE' }),
 };
 
 export const empresas = {
-  list: (redeId?: number) => api<Empresas.Empresa[]>(redeId != null ? `/empresas?rede_id=${redeId}` : '/empresas'),
+  list: (params?: { rede_id?: number; incluir_inativos?: boolean }) =>
+    api<Empresas.Empresa[]>(withParams('/empresas', params)),
   get: (id: number) => api<Empresas.Empresa>(`/empresas/${id}`),
+  consultarCnpj: (cnpj: string) => api<Empresas.ConsultaCNPJ>(`/empresas/consultar-cnpj/${encodeURIComponent(cnpj.replace(/\D/g, ''))}`),
   create: (data: Empresas.Create) => api<Empresas.Empresa>('/empresas', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: Empresas.Update) => api<Empresas.Empresa>(`/empresas/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: number) => api<void>(`/empresas/${id}`, { method: 'DELETE' }),
 };
 
+export const tiposNegocio = {
+  list: (params?: { incluir_inativos?: boolean }) => api<TiposNegocio.Tipo[]>(withParams('/tipos-negocio', params)),
+  get: (id: number) => api<TiposNegocio.Tipo>(`/tipos-negocio/${id}`),
+  create: (data: TiposNegocio.Create) => api<TiposNegocio.Tipo>('/tipos-negocio', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: TiposNegocio.Update) => api<TiposNegocio.Tipo>(`/tipos-negocio/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  delete: (id: number) => api<void>(`/tipos-negocio/${id}`, { method: 'DELETE' }),
+};
+
 export const setores = {
-  list: () => api<Setores.Setor[]>('/setores'),
+  list: (params?: { incluir_inativos?: boolean }) => api<Setores.Setor[]>(withParams('/setores', params)),
   get: (id: number) => api<Setores.Setor>(`/setores/${id}`),
   create: (data: Setores.Create) => api<Setores.Setor>('/setores', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: Setores.Update) => api<Setores.Setor>(`/setores/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
@@ -74,7 +95,7 @@ export const setores = {
 };
 
 export const atendentes = {
-  list: () => api<Atendentes.Atendente[]>('/atendentes'),
+  list: (params?: { incluir_inativos?: boolean }) => api<Atendentes.Atendente[]>(withParams('/atendentes', params)),
   me: () => api<Atendentes.Atendente>('/atendentes/me'),
   get: (id: number) => api<Atendentes.Atendente>(`/atendentes/${id}`),
   create: (data: Atendentes.Create) => api<Atendentes.Atendente>('/atendentes', { method: 'POST', body: JSON.stringify(data) }),
@@ -83,10 +104,8 @@ export const atendentes = {
 };
 
 export const funcionariosRede = {
-  list: (params?: { rede_id?: number; empresa_id?: number; tipo?: string }) => {
-    const q = new URLSearchParams(params as Record<string, string>).toString();
-    return api<FuncionariosRede.Funcionario[]>(`/funcionarios-rede${q ? `?${q}` : ''}`);
-  },
+  list: (params?: { rede_id?: number; empresa_id?: number; tipo?: string; incluir_inativos?: boolean }) =>
+    api<FuncionariosRede.Funcionario[]>(withParams('/funcionarios-rede', params)),
   get: (id: number) => api<FuncionariosRede.Funcionario>(`/funcionarios-rede/${id}`),
   create: (data: FuncionariosRede.Create) => api<FuncionariosRede.Funcionario>('/funcionarios-rede', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: FuncionariosRede.Update) => api<FuncionariosRede.Funcionario>(`/funcionarios-rede/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
@@ -94,11 +113,16 @@ export const funcionariosRede = {
 };
 
 export const statusTicket = {
-  list: () => api<StatusTicket.Status[]>('/status-ticket'),
+  list: (params?: { incluir_inativos?: boolean }) => api<StatusTicket.Status[]>(withParams('/status-ticket', params)),
   get: (id: number) => api<StatusTicket.Status>(`/status-ticket/${id}`),
   create: (data: StatusTicket.Create) => api<StatusTicket.Status>('/status-ticket', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: StatusTicket.Update) => api<StatusTicket.Status>(`/status-ticket/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: number) => api<void>(`/status-ticket/${id}`, { method: 'DELETE' }),
+};
+
+export const audit = {
+  list: (params?: { entity_type?: string; entity_id?: number }) =>
+    api<Audit.AuditLogEntry[]>(withParams('/audit', params)),
 };
 
 export const tickets = {
@@ -156,16 +180,92 @@ export namespace Empresas {
   export interface Empresa {
     id: number;
     rede_id: number;
+    tipo_negocio_id: number | null;
     nome: string;
+    cnpj_cpf: string | null;
+    razao_social: string | null;
+    nome_fantasia: string | null;
+    inscricao_estadual: string | null;
+    endereco: string | null;
+    numero: string | null;
+    complemento: string | null;
+    bairro: string | null;
+    cidade: string | null;
+    estado: string | null;
+    cep: string | null;
+    email: string | null;
+    telefone: string | null;
     ativo: boolean;
+  }
+  export interface ConsultaCNPJ {
+    cnpj: string;
+    razao_social: string;
+    nome_fantasia: string | null;
+    situacao: string | null;
+    endereco: string;
+    numero: string | null;
+    complemento: string | null;
+    bairro: string | null;
+    cidade: string | null;
+    estado: string | null;
+    cep: string | null;
+    email: string | null;
+    telefone: string | null;
+    abertura: string | null;
+    natureza_juridica: string | null;
+    atividade_principal: string | null;
   }
   export interface Create {
     rede_id: number;
+    tipo_negocio_id?: number | null;
     nome: string;
+    cnpj_cpf?: string | null;
+    razao_social?: string | null;
+    nome_fantasia?: string | null;
+    inscricao_estadual?: string | null;
+    endereco?: string | null;
+    numero?: string | null;
+    complemento?: string | null;
+    bairro?: string | null;
+    cidade?: string | null;
+    estado?: string | null;
+    cep?: string | null;
+    email?: string | null;
+    telefone?: string | null;
     ativo?: boolean;
   }
   export interface Update {
     rede_id?: number;
+    tipo_negocio_id?: number | null;
+    nome?: string;
+    cnpj_cpf?: string | null;
+    razao_social?: string | null;
+    nome_fantasia?: string | null;
+    inscricao_estadual?: string | null;
+    endereco?: string | null;
+    numero?: string | null;
+    complemento?: string | null;
+    bairro?: string | null;
+    cidade?: string | null;
+    estado?: string | null;
+    cep?: string | null;
+    email?: string | null;
+    telefone?: string | null;
+    ativo?: boolean;
+  }
+}
+
+export namespace TiposNegocio {
+  export interface Tipo {
+    id: number;
+    nome: string;
+    ativo: boolean;
+  }
+  export interface Create {
+    nome: string;
+    ativo?: boolean;
+  }
+  export interface Update {
     nome?: string;
     ativo?: boolean;
   }
@@ -311,5 +411,17 @@ export namespace Tickets {
     atendente_id?: number;
     assunto?: string;
     descricao?: string;
+  }
+}
+
+export namespace Audit {
+  export interface AuditLogEntry {
+    id: number;
+    entity_type: string;
+    entity_id: number;
+    action: string;
+    atendente_id: number | null;
+    atendente_nome: string | null;
+    created_at: string;
   }
 }
