@@ -32,6 +32,7 @@ export function RedeDetalhe() {
   const [tiposNegocioList, setTiposNegocioList] = useState<Awaited<ReturnType<typeof tiposNegocio.list>>>([])
   const [modalEmpresa, setModalEmpresa] = useState(false)
   const [editingEmpresaId, setEditingEmpresaId] = useState<number | null>(null)
+  const [modoEmpresa, setModoEmpresa] = useState<'create' | 'view' | 'edit'>('view')
   const [nomeEmpresa, setNomeEmpresa] = useState('')
   const [cnpjCpfEmpresa, setCnpjCpfEmpresa] = useState('')
   const [tipoNegocioIdEmpresa, setTipoNegocioIdEmpresa] = useState<number | ''>('')
@@ -96,6 +97,7 @@ export function RedeDetalhe() {
 
   function openNovaEmpresa() {
     setEditingEmpresaId(null)
+    setModoEmpresa('create')
     setNomeEmpresa('')
     setCnpjCpfEmpresa('')
     setTipoNegocioIdEmpresa('')
@@ -118,6 +120,30 @@ export function RedeDetalhe() {
 
   function openEditEmpresa(e: Awaited<ReturnType<typeof empresas.list>>[number]) {
     setEditingEmpresaId(e.id)
+    setModoEmpresa('edit')
+    setNomeEmpresa(e.nome)
+    setCnpjCpfEmpresa(e.cnpj_cpf ? maskCnpjCpf(e.cnpj_cpf) : '')
+    setTipoNegocioIdEmpresa(e.tipo_negocio_id ?? '')
+    setRazaoSocialEmpresa(e.razao_social ?? '')
+    setNomeFantasiaEmpresa(e.nome_fantasia ?? '')
+    setInscricaoEstadualEmpresa(e.inscricao_estadual ?? '')
+    setEnderecoEmpresa(e.endereco ?? '')
+    setNumeroEmpresa(e.numero ?? '')
+    setComplementoEmpresa(e.complemento ?? '')
+    setBairroEmpresa(e.bairro ?? '')
+    setCidadeEmpresa(e.cidade ?? '')
+    setEstadoEmpresa(e.estado ?? '')
+    setCepEmpresa(e.cep ?? '')
+    setEmailEmpresa(e.email ?? '')
+    setTelefoneEmpresa(e.telefone ?? '')
+    setAtivoEmpresa(e.ativo)
+    setErrorEmpresa('')
+    setModalEmpresa(true)
+  }
+
+  function openViewEmpresa(e: Awaited<ReturnType<typeof empresas.list>>[number]) {
+    setEditingEmpresaId(e.id)
+    setModoEmpresa('view')
     setNomeEmpresa(e.nome)
     setCnpjCpfEmpresa(e.cnpj_cpf ? maskCnpjCpf(e.cnpj_cpf) : '')
     setTipoNegocioIdEmpresa(e.tipo_negocio_id ?? '')
@@ -242,36 +268,43 @@ export function RedeDetalhe() {
     return null
   }
 
-  const linkVoltarRedes = (
-    <Link
-      to="/redes"
-      className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-slate-500 transition-colors duration-150 hover:bg-slate-50/80 hover:text-slate-700 focus:outline-none focus:bg-slate-50/80 focus:text-slate-700"
-    >
-      <span aria-hidden>←</span>
-      Voltar às redes
+  const linkRedes = (
+    <Link to="/redes" className="text-slate-600 hover:text-slate-900 font-medium">
+      Redes
     </Link>
   )
+
+  const labelEmpresaModal = modoEmpresa === 'create' ? 'Nova empresa' : nomeEmpresa || 'Empresa'
+  const isViewEmpresa = modoEmpresa === 'view'
+  const tipoNegocioNomeEmpresa =
+    tipoNegocioIdEmpresa === '' ? '' : tiposNegocioList.find((t) => t.id === Number(tipoNegocioIdEmpresa))?.nome ?? ''
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        {modalEmpresa ? (
-          <>
-            <button
-              type="button"
-              onClick={() => setModalEmpresa(false)}
-              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-slate-600 transition-colors duration-150 hover:bg-slate-50/80 hover:text-slate-900 focus:outline-none focus:bg-slate-50/80 focus:text-slate-900"
-            >
-              <span aria-hidden>←</span>
-              Voltar
-            </button>
-            <span className="text-slate-300">|</span>
-            {linkVoltarRedes}
-          </>
-        ) : (
-          linkVoltarRedes
-        )}
-        <h1 className="text-2xl font-bold text-slate-800">{rede.nome}</h1>
+        <nav aria-label="breadcrumb" className="flex items-center gap-2 text-sm text-slate-500">
+          {linkRedes}
+          <span aria-hidden className="text-slate-300">/</span>
+          <button
+            type="button"
+            onClick={() => {
+              if (modalEmpresa) {
+                setModoEmpresa('view')
+                setAba('empresas')
+              }
+              setModalEmpresa(false)
+            }}
+            className="font-medium text-slate-600 hover:text-slate-900"
+          >
+            {rede.nome}
+          </button>
+          {modalEmpresa && (
+            <>
+              <span aria-hidden className="text-slate-300">/</span>
+              <span className="truncate font-semibold text-slate-800">{labelEmpresaModal}</span>
+            </>
+          )}
+        </nav>
       </div>
 
       {!modalEmpresa && (
@@ -296,58 +329,197 @@ export function RedeDetalhe() {
       )}
 
       {aba === 'empresas' && modalEmpresa && (
-        <Card title={editingEmpresaId ? 'Editar empresa' : 'Nova empresa'}>
-              <form onSubmit={handleSubmitEmpresa} className="space-y-4">
-                {errorEmpresa && <div className="rounded bg-red-50 p-2 text-sm text-red-700">{errorEmpresa}</div>}
+        <Card title={isViewEmpresa ? 'Detalhe da empresa' : editingEmpresaId ? 'Editar empresa' : 'Nova empresa'}>
+          {isViewEmpresa ? (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Tipo de negócio</label>
-                  <select value={tipoNegocioIdEmpresa} onChange={(e) => setTipoNegocioIdEmpresa(e.target.value === '' ? '' : Number(e.target.value))} className="w-full rounded-lg border border-slate-300 px-3 py-2">
-                    <option value="">Selecione</option>
-                    {tiposNegocioList.map((t) => (
-                      <option key={t.id} value={t.id}>{t.nome}</option>
-                    ))}
-                  </select>
+                  <p className="text-xs font-medium text-slate-500">Tipo de negócio</p>
+                  <p className="text-sm text-slate-900">
+                    {tipoNegocioNomeEmpresa || '—'}
+                  </p>
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                  <div className="flex-1">
-                    <label className="mb-1 block text-sm font-medium text-slate-700">CNPJ / CPF</label>
-                    <input type="text" inputMode="numeric" placeholder="00.000.000/0001-00" value={cnpjCpfEmpresa} onChange={(e) => setCnpjCpfEmpresa(maskCnpjCpf(e.target.value))} className="w-full rounded-lg border border-slate-300 px-3 py-2" />
+                <div>
+                  <p className="text-xs font-medium text-slate-500">CNPJ / CPF</p>
+                  <p className="text-sm text-slate-900 break-all">{cnpjCpfEmpresa || '—'}</p>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <p className="text-xs font-medium text-slate-500">Nome</p>
+                  <p className="text-sm text-slate-900">{nomeEmpresa || '—'}</p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Razão social</p>
+                  <p className="text-sm text-slate-900">{razaoSocialEmpresa || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Nome fantasia</p>
+                  <p className="text-sm text-slate-900">{nomeFantasiaEmpresa || '—'}</p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Inscrição estadual</p>
+                  <p className="text-sm text-slate-900">{inscricaoEstadualEmpresa || '—'}</p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-medium text-slate-500">E-mail</p>
+                  <p className="text-sm text-slate-900">{emailEmpresa || '—'}</p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Telefone</p>
+                  <p className="text-sm text-slate-900">{telefoneEmpresa || '—'}</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-xs font-medium text-slate-500">Endereço</p>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">Logradouro</p>
+                    <p className="text-sm text-slate-900">{enderecoEmpresa || '—'}</p>
                   </div>
-                  <Button type="button" variant="secondary" onClick={handleConsultarCnpjEmpresa} disabled={loadingCnpjEmpresa} className="shrink-0" aria-label="Consultar CNPJ">
-                    {loadingCnpjEmpresa ? '...' : <svg className="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>}
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">Número</p>
+                    <p className="text-sm text-slate-900">{numeroEmpresa || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">Complemento</p>
+                    <p className="text-sm text-slate-900">{complementoEmpresa || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">Bairro</p>
+                    <p className="text-sm text-slate-900">{bairroEmpresa || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">Cidade</p>
+                    <p className="text-sm text-slate-900">{cidadeEmpresa || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">UF</p>
+                    <p className="text-sm text-slate-900">{estadoEmpresa || '—'}</p>
+                  </div>
+                  <div className="sm:col-span-1">
+                    <p className="text-xs font-medium text-slate-500">CEP</p>
+                    <p className="text-sm text-slate-900">{cepEmpresa || '—'}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between border-t border-slate-200 pt-4">
+                <span
+                  className={`rounded-md px-2 py-1 text-xs font-medium ${
+                    ativoEmpresa ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-700'
+                  }`}
+                >
+                  {ativoEmpresa ? 'Ativo' : 'Inativo'}
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setModoEmpresa('view')
+                      setAba('empresas')
+                      setModalEmpresa(false)
+                    }}
+                    aria-label="Voltar para a lista de empresas"
+                    className="px-3"
+                  >
+                    <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="M15 18l-6-6 6-6" />
+                    </svg>
+                    Voltar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    onClick={() => setModoEmpresa('edit')}
+                    className="px-3"
+                  >
+                    <IconPencil ariaHidden={false} />
+                    Editar
                   </Button>
                 </div>
-                <Input label="Nome *" value={nomeEmpresa} onChange={(e) => setNomeEmpresa(e.target.value)} required />
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <Input label="Razão social" value={razaoSocialEmpresa} onChange={(e) => setRazaoSocialEmpresa(e.target.value)} />
-                  <Input label="Nome fantasia" value={nomeFantasiaEmpresa} onChange={(e) => setNomeFantasiaEmpresa(e.target.value)} />
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmitEmpresa} className="space-y-4">
+              {errorEmpresa && <div className="rounded bg-red-50 p-2 text-sm text-red-700">{errorEmpresa}</div>}
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Tipo de negócio</label>
+                <select
+                  value={tipoNegocioIdEmpresa}
+                  onChange={(e) => setTipoNegocioIdEmpresa(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                >
+                  <option value="">Selecione</option>
+                  {tiposNegocioList.map((t) => (
+                    <option key={t.id} value={t.id}>{t.nome}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                <div className="flex-1">
+                  <label className="mb-1 block text-sm font-medium text-slate-700">CNPJ / CPF</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="00.000.000/0001-00"
+                    value={cnpjCpfEmpresa}
+                    onChange={(e) => setCnpjCpfEmpresa(maskCnpjCpf(e.target.value))}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                  />
                 </div>
-                <Input label="Inscrição estadual" value={inscricaoEstadualEmpresa} onChange={(e) => setInscricaoEstadualEmpresa(e.target.value)} />
-                <Input label="Endereço" value={enderecoEmpresa} onChange={(e) => setEnderecoEmpresa(e.target.value)} />
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <Input label="Número" value={numeroEmpresa} onChange={(e) => setNumeroEmpresa(e.target.value)} />
-                  <Input label="Complemento" value={complementoEmpresa} onChange={(e) => setComplementoEmpresa(e.target.value)} />
-                  <Input label="Bairro" value={bairroEmpresa} onChange={(e) => setBairroEmpresa(e.target.value)} />
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <Input label="Cidade" value={cidadeEmpresa} onChange={(e) => setCidadeEmpresa(e.target.value)} />
-                  <Input label="UF" value={estadoEmpresa} onChange={(e) => setEstadoEmpresa(e.target.value)} placeholder="SP" maxLength={2} />
-                  <Input label="CEP" value={cepEmpresa} onChange={(e) => setCepEmpresa(e.target.value.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2').slice(0, 9))} />
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <Input label="E-mail" type="email" value={emailEmpresa} onChange={(e) => setEmailEmpresa(e.target.value)} />
-                  <Input label="Telefone" value={telefoneEmpresa} onChange={(e) => setTelefoneEmpresa(e.target.value)} />
-                </div>
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input type="checkbox" checked={ativoEmpresa} onChange={(e) => setAtivoEmpresa(e.target.checked)} className="rounded border-slate-300" />
-                  Ativo
-                </label>
-                <div className="flex gap-2 pt-2 border-t border-slate-200">
-                  <Button type="submit" loading={savingEmpresa}>Salvar</Button>
-                  <Button type="button" variant="secondary" onClick={() => setModalEmpresa(false)}>Cancelar</Button>
-                </div>
-              </form>
-            </Card>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleConsultarCnpjEmpresa}
+                  disabled={loadingCnpjEmpresa}
+                  className="shrink-0"
+                  aria-label="Consultar CNPJ"
+                >
+                  {loadingCnpjEmpresa ? '...' : (
+                    <svg className="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  )}
+                </Button>
+              </div>
+              <Input label="Nome *" value={nomeEmpresa} onChange={(e) => setNomeEmpresa(e.target.value)} required />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Input label="Razão social" value={razaoSocialEmpresa} onChange={(e) => setRazaoSocialEmpresa(e.target.value)} />
+                <Input label="Nome fantasia" value={nomeFantasiaEmpresa} onChange={(e) => setNomeFantasiaEmpresa(e.target.value)} />
+              </div>
+              <Input label="Inscrição estadual" value={inscricaoEstadualEmpresa} onChange={(e) => setInscricaoEstadualEmpresa(e.target.value)} />
+              <Input label="Endereço" value={enderecoEmpresa} onChange={(e) => setEnderecoEmpresa(e.target.value)} />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <Input label="Número" value={numeroEmpresa} onChange={(e) => setNumeroEmpresa(e.target.value)} />
+                <Input label="Complemento" value={complementoEmpresa} onChange={(e) => setComplementoEmpresa(e.target.value)} />
+                <Input label="Bairro" value={bairroEmpresa} onChange={(e) => setBairroEmpresa(e.target.value)} />
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <Input label="Cidade" value={cidadeEmpresa} onChange={(e) => setCidadeEmpresa(e.target.value)} />
+                <Input label="UF" value={estadoEmpresa} onChange={(e) => setEstadoEmpresa(e.target.value)} placeholder="SP" maxLength={2} />
+                <Input label="CEP" value={cepEmpresa} onChange={(e) => setCepEmpresa(e.target.value.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2').slice(0, 9))} />
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Input label="E-mail" type="email" value={emailEmpresa} onChange={(e) => setEmailEmpresa(e.target.value)} />
+                <Input label="Telefone" value={telefoneEmpresa} onChange={(e) => setTelefoneEmpresa(e.target.value)} />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input type="checkbox" checked={ativoEmpresa} onChange={(e) => setAtivoEmpresa(e.target.checked)} className="rounded border-slate-300" />
+                Ativo
+              </label>
+              <div className="flex gap-2 pt-2 border-t border-slate-200">
+                <Button type="submit" loading={savingEmpresa}>Salvar</Button>
+                <Button type="button" variant="secondary" onClick={() => setModalEmpresa(false)}>Cancelar</Button>
+              </div>
+            </form>
+          )}
+        </Card>
       )}
 
       {aba === 'empresas' && !modalEmpresa && (
@@ -370,8 +542,8 @@ export function RedeDetalhe() {
                   key={e.id}
                   role="button"
                   tabIndex={0}
-                  onClick={() => openEditEmpresa(e)}
-                  onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openEditEmpresa(e); } }}
+                onClick={() => openViewEmpresa(e)}
+                onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openViewEmpresa(e); } }}
                   className="flex cursor-pointer items-center justify-between rounded-lg py-3 px-2 -mx-2 transition-colors duration-150 hover:bg-slate-50/80 focus:outline-none focus:bg-slate-50/80"
                 >
                   <div className="flex min-w-0 items-center gap-2">
