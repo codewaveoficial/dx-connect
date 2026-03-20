@@ -9,8 +9,10 @@ import { IconTrash } from '../components/ui/IconTrash'
 import { useToast } from '../components/ui/Toast'
 import { FiltroInativos } from '../components/ui/FiltroInativos'
 import { maskCnpjCpf, digitsOnly, isCnpj } from '../utils/maskCnpjCpf'
+import { SelectComPesquisa } from '../components/ui/SelectComPesquisa'
 
 type Aba = 'empresas' | 'funcionarios'
+type TipoFuncionario = 'socio' | 'supervisor' | 'colaborador'
 const tipoLabel: Record<string, string> = { socio: 'Sócio', supervisor: 'Supervisor', colaborador: 'Colaborador' }
 
 export function RedeDetalhe() {
@@ -53,6 +55,22 @@ export function RedeDetalhe() {
   const [loadingCnpjEmpresa, setLoadingCnpjEmpresa] = useState(false)
   const [errorEmpresa, setErrorEmpresa] = useState('')
 
+  const [modalFuncionario, setModalFuncionario] = useState(false)
+  const [nomeFuncionario, setNomeFuncionario] = useState('')
+  const [emailFuncionario, setEmailFuncionario] = useState('')
+  const [tipoFuncionario, setTipoFuncionario] = useState<TipoFuncionario>('colaborador')
+  const [ativoFuncionario, setAtivoFuncionario] = useState(true)
+  const [empresaIdFuncionario, setEmpresaIdFuncionario] = useState<number | ''>('')
+  const [empresaIdsFuncionario, setEmpresaIdsFuncionario] = useState<number[]>([])
+  const [savingFuncionario, setSavingFuncionario] = useState(false)
+  const [errorFuncionario, setErrorFuncionario] = useState('')
+
+  const empresasExibidas = incluirInativos ? empresasList : empresasList.filter((e) => e.ativo)
+
+  const empresasDaRedeParaVinculo = empresasList.filter(
+    (em) => em.ativo || em.id === empresaIdFuncionario || empresaIdsFuncionario.includes(em.id),
+  )
+
   function load() {
     if (!redeId || isNaN(redeId)) return
     setLoading(true)
@@ -60,7 +78,7 @@ export function RedeDetalhe() {
     toastShownForLoadRef.current = false
     Promise.all([
       redes.get(redeId),
-      empresas.list({ rede_id: redeId, incluir_inativos: incluirInativos }),
+      empresas.list({ rede_id: redeId, incluir_inativos: true }),
       redes.getFuncionarios(redeId, { incluir_inativos: incluirInativos }),
     ])
       .then(([r, e, f]) => {
@@ -246,6 +264,65 @@ export function RedeDetalhe() {
     navigate('/funcionarios-rede', { state: { editId: funcionarioId } })
   }
 
+  function openNovoFuncionario() {
+    setNomeFuncionario('')
+    setEmailFuncionario('')
+    setTipoFuncionario('colaborador')
+    setAtivoFuncionario(true)
+    setEmpresaIdFuncionario('')
+    setEmpresaIdsFuncionario([])
+    setErrorFuncionario('')
+    setAba('funcionarios')
+    setModalFuncionario(true)
+  }
+
+  function toggleEmpresaFuncionario(id: number) {
+    setEmpresaIdsFuncionario((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+
+  async function handleSubmitFuncionario(ev: React.FormEvent) {
+    ev.preventDefault()
+    setErrorFuncionario('')
+    const empresasNaRede = empresasList.filter((em) => em.rede_id === redeId)
+    if (tipoFuncionario === 'colaborador') {
+      const em = empresasList.find((x) => x.id === empresaIdFuncionario)
+      if (!em || em.rede_id !== redeId) {
+        setErrorFuncionario('Selecione uma empresa desta rede.')
+        return
+      }
+    }
+    if (tipoFuncionario === 'supervisor') {
+      if (!empresaIdsFuncionario.length) {
+        setErrorFuncionario('Marque ao menos uma empresa da rede.')
+        return
+      }
+      const invalid = empresaIdsFuncionario.some((eid) => !empresasNaRede.some((e) => e.id === eid))
+      if (invalid) {
+        setErrorFuncionario('Todas as empresas do supervisor devem ser desta rede.')
+        return
+      }
+    }
+    setSavingFuncionario(true)
+    try {
+      await funcionariosRede.create({
+        nome: nomeFuncionario.trim(),
+        email: emailFuncionario.trim(),
+        tipo: tipoFuncionario,
+        ativo: ativoFuncionario,
+        rede_id: tipoFuncionario === 'socio' ? redeId : undefined,
+        empresa_id: tipoFuncionario === 'colaborador' ? Number(empresaIdFuncionario) : undefined,
+        empresa_ids: tipoFuncionario === 'supervisor' ? empresaIdsFuncionario : undefined,
+      })
+      setModalFuncionario(false)
+      load()
+      toast.showSuccess('Funcionário cadastrado.')
+    } catch (err) {
+      setErrorFuncionario(err instanceof Error ? err.message : 'Erro ao salvar')
+    } finally {
+      setSavingFuncionario(false)
+    }
+  }
+
   async function handleDeleteFuncionario(funcionarioId: number) {
     if (!confirm('Excluir este funcionário?')) return
     try {
@@ -293,6 +370,7 @@ export function RedeDetalhe() {
                 setAba('empresas')
               }
               setModalEmpresa(false)
+              setModalFuncionario(false)
             }}
             className="font-medium text-slate-600 hover:text-slate-900"
           >
@@ -304,10 +382,16 @@ export function RedeDetalhe() {
               <span className="truncate font-semibold text-slate-800">{labelEmpresaModal}</span>
             </>
           )}
+          {modalFuncionario && (
+            <>
+              <span aria-hidden className="text-slate-300">/</span>
+              <span className="truncate font-semibold text-slate-800">Novo funcionário</span>
+            </>
+          )}
         </nav>
       </div>
 
-      {!modalEmpresa && (
+      {!modalEmpresa && !modalFuncionario && (
         <div className="border-b border-slate-200">
           <nav className="flex gap-4">
             <button
@@ -533,11 +617,11 @@ export function RedeDetalhe() {
           </div>
           {loading && !empresasList.length ? (
             <p className="text-slate-500">Carregando...</p>
-          ) : empresasList.length === 0 ? (
+          ) : empresasExibidas.length === 0 ? (
             <p className="text-slate-500">Nenhuma empresa nesta rede.</p>
           ) : (
             <ul className="divide-y divide-slate-200">
-              {empresasList.map((e) => (
+              {empresasExibidas.map((e) => (
                 <li
                   key={e.id}
                   role="button"
@@ -565,11 +649,110 @@ export function RedeDetalhe() {
         </Card>
       )}
 
-      {aba === 'funcionarios' && (
+      {aba === 'funcionarios' && modalFuncionario && (
+        <Card title="Novo funcionário">
+          <p className="mb-4 text-sm text-slate-600">
+            Rede: <span className="font-medium text-slate-800">{rede.nome}</span> — o vínculo será apenas com empresas desta rede.
+          </p>
+          <form onSubmit={handleSubmitFuncionario} className="space-y-4">
+            {errorFuncionario && (
+              <div className="rounded bg-red-50 p-2 text-sm text-red-700">{errorFuncionario}</div>
+            )}
+            <Input
+              label="Nome *"
+              value={nomeFuncionario}
+              onChange={(e) => setNomeFuncionario(e.target.value)}
+              required
+            />
+            <Input
+              label="E-mail *"
+              type="email"
+              value={emailFuncionario}
+              onChange={(e) => setEmailFuncionario(e.target.value)}
+              required
+            />
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Tipo</label>
+              <select
+                value={tipoFuncionario}
+                onChange={(e) => {
+                  const t = e.target.value as TipoFuncionario
+                  setTipoFuncionario(t)
+                  setEmpresaIdFuncionario('')
+                  setEmpresaIdsFuncionario([])
+                }}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2"
+              >
+                <option value="socio">Sócio</option>
+                <option value="supervisor">Supervisor</option>
+                <option value="colaborador">Colaborador</option>
+              </select>
+            </div>
+            {tipoFuncionario === 'colaborador' && (
+              <SelectComPesquisa
+                id="rede-detalhe-func-empresa"
+                label="Empresa desta rede *"
+                value={empresaIdFuncionario}
+                onChange={(id) => setEmpresaIdFuncionario(id)}
+                required
+                items={empresasDaRedeParaVinculo.map((x) => ({
+                  id: x.id,
+                  label: x.nome,
+                  createdAt: x.created_at,
+                }))}
+                hint="Últimas empresas desta rede. Digite para buscar."
+              />
+            )}
+            {tipoFuncionario === 'supervisor' && (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Empresas desta rede</label>
+                {empresasDaRedeParaVinculo.length === 0 ? (
+                  <p className="text-sm text-slate-500">Nenhuma empresa ativa nesta rede.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 p-3">
+                    {empresasDaRedeParaVinculo.map((e) => (
+                      <label key={e.id} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={empresaIdsFuncionario.includes(e.id)}
+                          onChange={() => toggleEmpresaFuncionario(e.id)}
+                        />
+                        <span>{e.nome}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={ativoFuncionario}
+                onChange={(e) => setAtivoFuncionario(e.target.checked)}
+                className="rounded border-slate-300"
+              />
+              Ativo
+            </label>
+            <div className="flex gap-2 border-t border-slate-200 pt-2">
+              <Button type="submit" loading={savingFuncionario}>
+                Salvar
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => setModalFuncionario(false)}>
+                Cancelar
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
+
+      {aba === 'funcionarios' && !modalFuncionario && (
         <Card>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
             <h2 className="text-lg font-semibold text-slate-800">Funcionários da rede</h2>
-            <FiltroInativos incluirInativos={incluirInativos} onChange={setIncluirInativos} />
+            <div className="flex items-center gap-3">
+              <FiltroInativos incluirInativos={incluirInativos} onChange={setIncluirInativos} />
+              <Button onClick={openNovoFuncionario}>Novo funcionário</Button>
+            </div>
           </div>
           {loading && !funcionariosList.length ? (
             <p className="text-slate-500">Carregando...</p>

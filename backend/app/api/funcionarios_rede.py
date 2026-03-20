@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import FuncionarioRede, FuncionarioRedeEmpresa, Ticket
+from app.models import FuncionarioRede, FuncionarioRedeEmpresa, Ticket, Empresa
 from app.models.atendente import Atendente
 from app.schemas.funcionario_rede import FuncionarioRedeCreate, FuncionarioRedeUpdate, FuncionarioRedeRead
 from app.core.auth import exigir_admin
@@ -67,12 +67,29 @@ def criar(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Colaborador deve ter empresa_id")
     if data.tipo == "supervisor" and not data.empresa_ids:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Supervisor deve ter ao menos uma empresa")
+    rede_id_final = data.rede_id
+    if data.tipo == "supervisor":
+        emps = db.query(Empresa).filter(Empresa.id.in_(data.empresa_ids)).all()
+        if len(emps) != len(set(data.empresa_ids)):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empresa inválida na lista")
+        redes_emp = {e.rede_id for e in emps}
+        if len(redes_emp) != 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Supervisor: todas as empresas devem pertencer à mesma rede.",
+            )
+        rede_id_final = list(redes_emp)[0]
+    elif data.tipo == "colaborador" and data.empresa_id:
+        emp = db.query(Empresa).filter(Empresa.id == data.empresa_id).first()
+        if not emp:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Empresa não encontrada")
+        rede_id_final = emp.rede_id
     f = FuncionarioRede(
         nome=data.nome,
         email=data.email,
         tipo=data.tipo,
         ativo=data.ativo,
-        rede_id=data.rede_id,
+        rede_id=rede_id_final,
         empresa_id=data.empresa_id,
     )
     db.add(f)
@@ -113,9 +130,24 @@ def atualizar(
     for k, v in update.items():
         setattr(f, k, v)
     if empresa_ids is not None and f.tipo == "supervisor":
+        if empresa_ids:
+            emps = db.query(Empresa).filter(Empresa.id.in_(empresa_ids)).all()
+            if len(emps) != len(set(empresa_ids)):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empresa inválida na lista")
+            redes_emp = {e.rede_id for e in emps}
+            if len(redes_emp) != 1:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Supervisor: todas as empresas devem pertencer à mesma rede.",
+                )
+            f.rede_id = list(redes_emp)[0]
         db.query(FuncionarioRedeEmpresa).filter(FuncionarioRedeEmpresa.funcionario_id == f.id).delete()
         for emp_id in empresa_ids:
             db.add(FuncionarioRedeEmpresa(funcionario_id=f.id, empresa_id=emp_id))
+    if f.tipo == "colaborador" and f.empresa_id:
+        emp = db.query(Empresa).filter(Empresa.id == f.empresa_id).first()
+        if emp:
+            f.rede_id = emp.rede_id
     registrar_audit(db, "funcionario_rede", funcionario_id, "update", atendente.id)
     db.commit()
     db.refresh(f)

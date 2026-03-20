@@ -7,6 +7,7 @@ import { IconPencil } from '../components/ui/IconPencil'
 import { IconTrash } from '../components/ui/IconTrash'
 import { useToast } from '../components/ui/Toast'
 import { FiltroInativos } from '../components/ui/FiltroInativos'
+import { SelectComPesquisa } from '../components/ui/SelectComPesquisa'
 import { maskCnpjCpf, digitsOnly, isCnpj } from '../utils/maskCnpjCpf'
 
 export function Empresas() {
@@ -52,7 +53,10 @@ export function Empresas() {
 
   function openCreate() {
     setEditingId(null)
-    setRedeId(redesList[0]?.id ?? '')
+    const sorted = [...redesList].sort(
+      (a, b) => (Date.parse(b.created_at ?? '') || 0) - (Date.parse(a.created_at ?? '') || 0),
+    )
+    setRedeId(sorted[0]?.id ?? '')
     setTipoNegocioId('')
     setNome('')
     setCnpjCpf('')
@@ -193,14 +197,18 @@ export function Empresas() {
             {error && <div className="rounded bg-red-50 p-2 text-sm text-red-700">{error}</div>}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Rede *</label>
-                <select value={redeId} onChange={(e) => setRedeId(Number(e.target.value))} required className="w-full rounded-lg border border-slate-300 px-3 py-2">
-                  {redesList.map((r) => (
-                    <option key={r.id} value={r.id}>{r.nome}</option>
-                  ))}
-                </select>
-              </div>
+              <SelectComPesquisa
+                id="empresa-rede"
+                label="Rede"
+                value={redeId}
+                onChange={(id) => setRedeId(id)}
+                required
+                items={redesList.map((r) => ({
+                  id: r.id,
+                  label: r.nome,
+                  createdAt: r.created_at,
+                }))}
+              />
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">Tipo de negócio</label>
                 <select value={tipoNegocioId} onChange={(e) => setTipoNegocioId(e.target.value === '' ? '' : Number(e.target.value))} className="w-full rounded-lg border border-slate-300 px-3 py-2">

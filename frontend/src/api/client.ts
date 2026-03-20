@@ -162,6 +162,8 @@ export namespace Redes {
     id: number;
     nome: string;
     ativo: boolean;
+    created_at?: string | null;
+    updated_at?: string | null;
   }
   export interface FuncionarioComVinculo extends FuncionariosRede.Funcionario {
     vinculado_a: string;
@@ -196,6 +198,8 @@ export namespace Empresas {
     email: string | null;
     telefone: string | null;
     ativo: boolean;
+    created_at?: string | null;
+    updated_at?: string | null;
   }
   export interface ConsultaCNPJ {
     cnpj: string;

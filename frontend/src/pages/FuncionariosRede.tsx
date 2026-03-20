@@ -8,6 +8,7 @@ import { IconPencil } from '../components/ui/IconPencil'
 import { IconTrash } from '../components/ui/IconTrash'
 import { useToast } from '../components/ui/Toast'
 import { FiltroInativos } from '../components/ui/FiltroInativos'
+import { SelectComPesquisa } from '../components/ui/SelectComPesquisa'
 
 type Tipo = 'socio' | 'supervisor' | 'colaborador'
 
@@ -39,8 +40,8 @@ export function FuncionariosRede() {
 
   useEffect(() => {
     load()
-    redes.list().then(setRedesList)
-    empresas.list().then(setEmpresasList)
+    redes.list({ incluir_inativos: true }).then(setRedesList)
+    empresas.list({ incluir_inativos: true }).then(setEmpresasList)
   }, [incluirInativos])
 
   useEffect(() => {
@@ -52,13 +53,20 @@ export function FuncionariosRede() {
     }
   }, [list, location.state, location.pathname, navigate])
 
+  function redePadraoRecente() {
+    const sorted = [...redesList].sort(
+      (a, b) => (Date.parse(b.created_at ?? '') || 0) - (Date.parse(a.created_at ?? '') || 0),
+    )
+    return sorted[0]?.id ?? ''
+  }
+
   function openCreate() {
     setEditingId(null)
     setNome('')
     setEmail('')
     setTipo('colaborador')
     setAtivo(true)
-    setRedeId('')
+    setRedeId(redePadraoRecente())
     setEmpresaId('')
     setEmpresaIds([])
     setError('')
@@ -71,7 +79,16 @@ export function FuncionariosRede() {
     setEmail(item.email)
     setTipo(item.tipo as Tipo)
     setAtivo(item.ativo)
-    setRedeId(item.rede_id ?? '')
+    let r = item.rede_id ?? ('' as number | '')
+    if (r === '' && item.tipo === 'colaborador' && item.empresa_id) {
+      const em = empresasList.find((e) => e.id === item.empresa_id)
+      if (em) r = em.rede_id
+    }
+    if (r === '' && item.tipo === 'supervisor' && item.empresa_ids?.length) {
+      const em = empresasList.find((e) => e.id === item.empresa_ids![0])
+      if (em) r = em.rede_id
+    }
+    setRedeId(r)
     setEmpresaId(item.empresa_id ?? '')
     setEmpresaIds(item.empresa_ids ?? [])
     setError('')
@@ -85,6 +102,30 @@ export function FuncionariosRede() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    if (!redeId) {
+      setError('Selecione a rede.')
+      return
+    }
+    const rid = Number(redeId)
+    const empresasNaRede = empresasList.filter((em) => em.rede_id === rid)
+    if (tipo === 'colaborador') {
+      const em = empresasList.find((x) => x.id === empresaId)
+      if (!em || em.rede_id !== rid) {
+        setError('Selecione uma empresa desta rede.')
+        return
+      }
+    }
+    if (tipo === 'supervisor') {
+      if (!empresaIds.length) {
+        setError('Marque ao menos uma empresa da rede.')
+        return
+      }
+      const invalid = empresaIds.some((id) => !empresasNaRede.some((e) => e.id === id))
+      if (invalid) {
+        setError('Todas as empresas do supervisor devem ser da rede selecionada.')
+        return
+      }
+    }
     setSaving(true)
     try {
       const payload = {
@@ -92,7 +133,7 @@ export function FuncionariosRede() {
         email,
         tipo,
         ativo,
-        rede_id: tipo === 'socio' ? Number(redeId) : undefined,
+        rede_id: tipo === 'socio' ? rid : undefined,
         empresa_id: tipo === 'colaborador' ? Number(empresaId) : undefined,
         empresa_ids: tipo === 'supervisor' ? empresaIds : undefined,
       }
@@ -122,6 +163,10 @@ export function FuncionariosRede() {
 
   const tipoLabel = { socio: 'Sócio', supervisor: 'Supervisor', colaborador: 'Colaborador' }
 
+  const empresasDaRede = empresasList.filter(
+    (em) => em.rede_id === Number(redeId) && (em.ativo || em.id === empresaId || empresaIds.includes(em.id)),
+  )
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between">
@@ -137,45 +182,72 @@ export function FuncionariosRede() {
             <Input label="E-mail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Tipo</label>
-              <select value={tipo} onChange={(e) => setTipo(e.target.value as Tipo)} className="w-full rounded-lg border border-slate-300 px-3 py-2">
+              <select
+                value={tipo}
+                onChange={(e) => {
+                  const t = e.target.value as Tipo
+                  setTipo(t)
+                  setEmpresaId('')
+                  setEmpresaIds([])
+                  if (t === 'socio' && !redeId) setRedeId(redePadraoRecente())
+                }}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2"
+              >
                 <option value="socio">Sócio</option>
                 <option value="supervisor">Supervisor</option>
                 <option value="colaborador">Colaborador</option>
               </select>
             </div>
-            {tipo === 'socio' && (
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Rede</label>
-                <select value={redeId} onChange={(e) => setRedeId(Number(e.target.value))} required className="w-full rounded-lg border border-slate-300 px-3 py-2">
-                  <option value="">Selecione</option>
-                  {redesList.map((r) => (
-                    <option key={r.id} value={r.id}>{r.nome}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <SelectComPesquisa
+              id="funcionario-rede"
+              label="Rede"
+              value={redeId}
+              onChange={(id) => {
+                setRedeId(id)
+                setEmpresaId('')
+                setEmpresaIds([])
+              }}
+              required
+              items={redesList.map((r) => ({
+                id: r.id,
+                label: r.nome,
+                createdAt: r.created_at,
+              }))}
+              hint="Últimas redes cadastradas. Digite para buscar outras."
+            />
             {tipo === 'colaborador' && (
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Empresa</label>
-                <select value={empresaId} onChange={(e) => setEmpresaId(Number(e.target.value))} required className="w-full rounded-lg border border-slate-300 px-3 py-2">
-                  <option value="">Selecione</option>
-                  {empresasList.map((e) => (
-                    <option key={e.id} value={e.id}>{e.nome}</option>
-                  ))}
-                </select>
-              </div>
+              <SelectComPesquisa
+                id="funcionario-empresa"
+                label="Empresa desta rede"
+                value={empresaId}
+                onChange={(id) => setEmpresaId(id)}
+                required
+                disabled={!redeId}
+                items={empresasDaRede.map((x) => ({
+                  id: x.id,
+                  label: x.nome,
+                  createdAt: x.created_at,
+                }))}
+                hint={!redeId ? 'Selecione a rede primeiro.' : 'Últimas empresas desta rede. Digite para buscar.'}
+              />
             )}
             {tipo === 'supervisor' && (
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Empresas</label>
-                <div className="flex flex-wrap gap-2">
-                  {empresasList.map((e) => (
-                    <label key={e.id} className="flex items-center gap-2">
-                      <input type="checkbox" checked={empresaIds.includes(e.id)} onChange={() => toggleEmpresa(e.id)} />
-                      <span>{e.nome}</span>
-                    </label>
-                  ))}
-                </div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Empresas desta rede</label>
+                {!redeId ? (
+                  <p className="text-sm text-slate-500">Selecione a rede primeiro.</p>
+                ) : empresasDaRede.length === 0 ? (
+                  <p className="text-sm text-slate-500">Nenhuma empresa ativa nesta rede.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 p-3">
+                    {empresasDaRede.map((e) => (
+                      <label key={e.id} className="flex items-center gap-2">
+                        <input type="checkbox" checked={empresaIds.includes(e.id)} onChange={() => toggleEmpresa(e.id)} />
+                        <span>{e.nome}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             <label className="flex items-center gap-2 text-sm text-slate-700">

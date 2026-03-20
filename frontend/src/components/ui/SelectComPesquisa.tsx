@@ -1,0 +1,143 @@
+import { useState, useMemo, useRef, useEffect } from 'react'
+
+export interface ItemSelectPesquisa {
+  id: number
+  label: string
+  /** ISO ou string parseável para ordenar “mais recente primeiro” */
+  createdAt?: string | null
+}
+
+const MAX_MATCHES = 40
+const DEFAULT_RECENT = 3
+
+function parseTime(iso?: string | null): number {
+  if (!iso) return 0
+  const t = Date.parse(iso)
+  return Number.isNaN(t) ? 0 : t
+}
+
+interface SelectComPesquisaProps {
+  label: string
+  value: number | ''
+  onChange: (id: number) => void
+  items: ItemSelectPesquisa[]
+  placeholder?: string
+  required?: boolean
+  disabled?: boolean
+  /** Quantidade exibida quando a busca está vazia (últimos por data de cadastro) */
+  recentCount?: number
+  hint?: string
+  id?: string
+}
+
+export function SelectComPesquisa({
+  label,
+  value,
+  onChange,
+  items,
+  placeholder = 'Buscar...',
+  required,
+  disabled,
+  recentCount = DEFAULT_RECENT,
+  hint = 'Sem digitar: últimos cadastros. Digite para filtrar.',
+  id: domId,
+}: SelectComPesquisaProps) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const rootRef = useRef<HTMLDivElement>(null)
+  const listId = domId ? `${domId}-listbox` : undefined
+
+  const sorted = useMemo(
+    () => [...items].sort((a, b) => parseTime(b.createdAt) - parseTime(a.createdAt)),
+    [items],
+  )
+
+  const displayed = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) {
+      return sorted.slice(0, recentCount)
+    }
+    return sorted.filter((it) => it.label.toLowerCase().includes(q)).slice(0, MAX_MATCHES)
+  }, [sorted, query, recentCount])
+
+  const selectedLabel = value !== '' ? items.find((i) => i.id === value)?.label ?? '' : ''
+
+  useEffect(() => {
+    if (!open) return
+    function onDocClick(ev: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(ev.target as Node)) {
+        setOpen(false)
+        setQuery('')
+      }
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [open])
+
+  return (
+    <div ref={rootRef} className="relative">
+      <label htmlFor={domId} className="mb-1 block text-sm font-medium text-slate-700">
+        {label}
+        {required ? ' *' : ''}
+      </label>
+      <button
+        type="button"
+        id={domId}
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={listId}
+        onClick={() => !disabled && setOpen((o) => !o)}
+        className="flex w-full items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-800 transition-colors hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <span className={!selectedLabel ? 'text-slate-400' : ''}>
+          {selectedLabel || placeholder}
+        </span>
+        <span className="text-slate-400" aria-hidden>
+          {open ? '▴' : '▾'}
+        </span>
+      </button>
+      {open && (
+        <div
+          className="absolute z-30 mt-1 w-full rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+          role="listbox"
+          id={listId}
+        >
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={placeholder}
+            className="w-full border-b border-slate-100 px-3 py-2 text-sm outline-none focus:bg-slate-50/50"
+            autoFocus
+            aria-label={`Buscar em ${label}`}
+          />
+          <p className="px-3 py-1.5 text-xs text-slate-400">{hint}</p>
+          <ul className="max-h-52 overflow-y-auto py-1">
+            {displayed.length === 0 ? (
+              <li className="px-3 py-2 text-sm text-slate-500">Nenhum resultado.</li>
+            ) : (
+              displayed.map((it) => (
+                <li key={it.id} role="none">
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={value === it.id}
+                    className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-slate-50/80 ${value === it.id ? 'bg-slate-50 font-medium text-slate-900' : 'text-slate-700'}`}
+                    onClick={() => {
+                      onChange(it.id)
+                      setOpen(false)
+                      setQuery('')
+                    }}
+                  >
+                    {it.label}
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
