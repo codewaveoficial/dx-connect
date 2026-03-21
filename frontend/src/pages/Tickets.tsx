@@ -1,33 +1,57 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { tickets, statusTicket, type Tickets } from '../api/client'
+import { coletarTodasPaginas } from '../api/collectPages'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { IconEye } from '../components/ui/IconEye'
+import { BarraBuscaPaginacao, PAGE_SIZE_PADRAO } from '../components/ui/BarraBuscaPaginacao'
 
 export function Tickets() {
   const navigate = useNavigate()
   const [list, setList] = useState<Tickets.Ticket[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [busca, setBusca] = useState('')
+  const [debouncedBusca, setDebouncedBusca] = useState('')
   const [loading, setLoading] = useState(true)
-  const [filtroProtocolo, setFiltroProtocolo] = useState('')
   const [filtroStatus, setFiltroStatus] = useState<number | ''>('')
   const [statusList, setStatusList] = useState<{ id: number; nome: string }[]>([])
 
   useEffect(() => {
-    statusTicket.list().then((s) => setStatusList(s))
+    coletarTodasPaginas((o, l) => statusTicket.list({ offset: o, limit: l })).then((rows) =>
+      setStatusList(rows.map((s) => ({ id: s.id, nome: s.nome }))),
+    )
   }, [])
 
   useEffect(() => {
+    const t = setTimeout(() => setDebouncedBusca(busca.trim()), 400)
+    return () => clearTimeout(t)
+  }, [busca])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedBusca, filtroStatus])
+
+  useEffect(() => {
     setLoading(true)
-    const params: { protocolo?: string; status_id?: number } = {}
-    if (filtroProtocolo) params.protocolo = filtroProtocolo
-    if (filtroStatus !== '') params.status_id = Number(filtroStatus)
     tickets
-      .list(params)
-      .then(setList)
-      .catch(() => setList([]))
+      .list({
+        busca: debouncedBusca || undefined,
+        status_id: filtroStatus !== '' ? Number(filtroStatus) : undefined,
+        offset: (page - 1) * PAGE_SIZE_PADRAO,
+        limit: PAGE_SIZE_PADRAO,
+      })
+      .then(({ items, total: t }) => {
+        setList(items)
+        setTotal(t)
+      })
+      .catch(() => {
+        setList([])
+        setTotal(0)
+      })
       .finally(() => setLoading(false))
-  }, [filtroProtocolo, filtroStatus])
+  }, [page, debouncedBusca, filtroStatus])
 
   return (
     <div className="space-y-6">
@@ -39,27 +63,30 @@ export function Tickets() {
       </div>
 
       <Card>
-        <div className="mb-4 flex flex-wrap gap-4">
-          <input
-            type="text"
-            placeholder="Buscar por protocolo"
-            value={filtroProtocolo}
-            onChange={(e) => setFiltroProtocolo(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-          />
-          <select
-            value={filtroStatus}
-            onChange={(e) => setFiltroStatus(e.target.value === '' ? '' : Number(e.target.value))}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-          >
-            <option value="">Todos os status</option>
-            {statusList.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.nome}
-              </option>
-            ))}
-          </select>
-        </div>
+        <BarraBuscaPaginacao
+          busca={busca}
+          onBuscaChange={setBusca}
+          placeholder="Buscar por protocolo, assunto ou empresa"
+          page={page}
+          total={total}
+          onPageChange={setPage}
+          disabled={loading}
+          extra={
+            <select
+              value={filtroStatus}
+              onChange={(e) => setFiltroStatus(e.target.value === '' ? '' : Number(e.target.value))}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              aria-label="Filtrar por status"
+            >
+              <option value="">Todos os status</option>
+              {statusList.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nome}
+                </option>
+              ))}
+            </select>
+          }
+        />
 
         {loading ? (
           <p className="text-slate-500">Carregando...</p>
@@ -86,7 +113,12 @@ export function Tickets() {
                     role="button"
                     tabIndex={0}
                     onClick={() => navigate(`/tickets/${t.id}`)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/tickets/${t.id}`); } }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        navigate(`/tickets/${t.id}`)
+                      }
+                    }}
                     className="cursor-pointer border-b border-slate-100 transition-colors duration-150 hover:bg-slate-50/80 focus:outline-none focus:bg-slate-50/80"
                   >
                     <td className="py-3 pr-4 font-mono text-slate-800">{t.protocolo}</td>

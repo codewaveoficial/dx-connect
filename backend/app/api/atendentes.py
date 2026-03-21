@@ -1,14 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Atendente, Setor
 from app.schemas.atendente import AtendenteCreate, AtendenteRead, AtendenteUpdate
+from app.schemas.lista_paginada import ListaPaginada
 from app.core.auth import exigir_admin, obter_atendente_atual
 from app.core.security import hash_senha
 from app.core.audit import registrar_audit
 
 router = APIRouter(prefix="/atendentes", tags=["atendentes"])
+
+_MAX_PAGE = 100
+_DEFAULT_PAGE = 20
 
 
 def _atendente_para_read(atendente: Atendente) -> AtendenteRead:
@@ -24,16 +29,24 @@ def _atendente_para_read(atendente: Atendente) -> AtendenteRead:
     )
 
 
-@router.get("", response_model=list[AtendenteRead])
+@router.get("", response_model=ListaPaginada[AtendenteRead])
 def listar_atendentes(
     incluir_inativos: bool = Query(False, description="Incluir atendentes inativos"),
+    busca: str | None = Query(None, description="Filtra por nome ou e-mail"),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(_DEFAULT_PAGE, ge=1, le=_MAX_PAGE),
     db: Session = Depends(get_db),
     _: Atendente = Depends(exigir_admin),
 ):
-    q = db.query(Atendente).order_by(Atendente.nome)
+    q = db.query(Atendente)
     if not incluir_inativos:
         q = q.filter(Atendente.ativo.is_(True))
-    return [_atendente_para_read(a) for a in q.all()]
+    if busca and busca.strip():
+        term = f"%{busca.strip()}%"
+        q = q.filter(or_(Atendente.nome.ilike(term), Atendente.email.ilike(term)))
+    total = q.count()
+    rows = q.order_by(Atendente.nome).offset(offset).limit(limit).all()
+    return ListaPaginada(items=[_atendente_para_read(a) for a in rows], total=total)
 
 
 @router.post("", response_model=AtendenteRead, status_code=201)

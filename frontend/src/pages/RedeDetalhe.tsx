@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { redes, empresas, funcionariosRede, tiposNegocio } from '../api/client'
+import { redes, empresas, funcionariosRede, tiposNegocio, type Redes, type Empresas, type TiposNegocio } from '../api/client'
+import { coletarTodasPaginas } from '../api/collectPages'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -10,10 +11,13 @@ import { useToast } from '../components/ui/Toast'
 import { FiltroInativos } from '../components/ui/FiltroInativos'
 import { maskCnpjCpf, digitsOnly, isCnpj } from '../utils/maskCnpjCpf'
 import { SelectComPesquisa } from '../components/ui/SelectComPesquisa'
+import { BarraBuscaPaginacao, PAGE_SIZE_PADRAO } from '../components/ui/BarraBuscaPaginacao'
 
 type Aba = 'empresas' | 'funcionarios'
 type TipoFuncionario = 'socio' | 'supervisor' | 'colaborador'
 const tipoLabel: Record<string, string> = { socio: 'Sócio', supervisor: 'Supervisor', colaborador: 'Colaborador' }
+
+type FuncionarioListaItem = Redes.FuncionarioComVinculo
 
 export function RedeDetalhe() {
   const { id } = useParams<{ id: string }>()
@@ -22,8 +26,16 @@ export function RedeDetalhe() {
   const redeId = id ? parseInt(id, 10) : NaN
 
   const [rede, setRede] = useState<Awaited<ReturnType<typeof redes.get>> | null>(null)
-  const [empresasList, setEmpresasList] = useState<Awaited<ReturnType<typeof empresas.list>>>([])
-  const [funcionariosList, setFuncionariosList] = useState<Awaited<ReturnType<typeof redes.getFuncionarios>>>([])
+  const [empresasList, setEmpresasList] = useState<Empresas.Empresa[]>([])
+  const [funcionariosList, setFuncionariosList] = useState<FuncionarioListaItem[]>([])
+  const [funcionariosTotal, setFuncionariosTotal] = useState(0)
+  const [pageFuncionarios, setPageFuncionarios] = useState(1)
+  const [buscaFuncionarios, setBuscaFuncionarios] = useState('')
+  const [debouncedBuscaFuncionarios, setDebouncedBuscaFuncionarios] = useState('')
+  const [loadingFuncionarios, setLoadingFuncionarios] = useState(false)
+  const [buscaEmpresas, setBuscaEmpresas] = useState('')
+  const [debouncedBuscaEmpresas, setDebouncedBuscaEmpresas] = useState('')
+  const [pageEmpresas, setPageEmpresas] = useState(1)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const toastShownForLoadRef = useRef(false)
@@ -31,7 +43,7 @@ export function RedeDetalhe() {
   const [aba, setAba] = useState<Aba>('empresas')
   const [incluirInativos, setIncluirInativos] = useState(false)
 
-  const [tiposNegocioList, setTiposNegocioList] = useState<Awaited<ReturnType<typeof tiposNegocio.list>>>([])
+  const [tiposNegocioList, setTiposNegocioList] = useState<TiposNegocio.Tipo[]>([])
   const [modalEmpresa, setModalEmpresa] = useState(false)
   const [editingEmpresaId, setEditingEmpresaId] = useState<number | null>(null)
   const [modoEmpresa, setModoEmpresa] = useState<'create' | 'view' | 'edit'>('view')
@@ -56,6 +68,9 @@ export function RedeDetalhe() {
   const [errorEmpresa, setErrorEmpresa] = useState('')
 
   const [modalFuncionario, setModalFuncionario] = useState(false)
+  const [modoFuncionario, setModoFuncionario] = useState<'create' | 'view' | 'edit'>('view')
+  const [editingFuncionarioId, setEditingFuncionarioId] = useState<number | null>(null)
+  const [vinculadoFuncionarioView, setVinculadoFuncionarioView] = useState('')
   const [nomeFuncionario, setNomeFuncionario] = useState('')
   const [emailFuncionario, setEmailFuncionario] = useState('')
   const [tipoFuncionario, setTipoFuncionario] = useState<TipoFuncionario>('colaborador')
@@ -65,26 +80,61 @@ export function RedeDetalhe() {
   const [savingFuncionario, setSavingFuncionario] = useState(false)
   const [errorFuncionario, setErrorFuncionario] = useState('')
 
-  const empresasExibidas = incluirInativos ? empresasList : empresasList.filter((e) => e.ativo)
+  const empresasFiltradas = useMemo(() => {
+    const base = incluirInativos ? empresasList : empresasList.filter((e) => e.ativo)
+    if (!debouncedBuscaEmpresas) return base
+    const q = debouncedBuscaEmpresas.toLowerCase()
+    const digits = debouncedBuscaEmpresas.replace(/\D/g, '')
+    return base.filter(
+      (e) =>
+        e.nome.toLowerCase().includes(q) ||
+        (e.razao_social && e.razao_social.toLowerCase().includes(q)) ||
+        (e.nome_fantasia && e.nome_fantasia.toLowerCase().includes(q)) ||
+        (digits.length > 0 && e.cnpj_cpf && e.cnpj_cpf.replace(/\D/g, '').includes(digits)),
+    )
+  }, [empresasList, incluirInativos, debouncedBuscaEmpresas])
+
+  const empresasPagina = useMemo(() => {
+    const start = (pageEmpresas - 1) * PAGE_SIZE_PADRAO
+    return empresasFiltradas.slice(start, start + PAGE_SIZE_PADRAO)
+  }, [empresasFiltradas, pageEmpresas])
 
   const empresasDaRedeParaVinculo = empresasList.filter(
     (em) => em.ativo || em.id === empresaIdFuncionario || empresaIdsFuncionario.includes(em.id),
   )
 
-  function load() {
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedBuscaFuncionarios(buscaFuncionarios.trim()), 400)
+    return () => clearTimeout(t)
+  }, [buscaFuncionarios])
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedBuscaEmpresas(buscaEmpresas.trim()), 400)
+    return () => clearTimeout(t)
+  }, [buscaEmpresas])
+
+  useEffect(() => {
+    setPageFuncionarios(1)
+  }, [debouncedBuscaFuncionarios, incluirInativos])
+
+  useEffect(() => {
+    setPageEmpresas(1)
+  }, [debouncedBuscaEmpresas, incluirInativos])
+
+  function loadRedeEEmpresas() {
     if (!redeId || isNaN(redeId)) return
     setLoading(true)
     setLoadError(false)
     toastShownForLoadRef.current = false
     Promise.all([
       redes.get(redeId),
-      empresas.list({ rede_id: redeId, incluir_inativos: true }),
-      redes.getFuncionarios(redeId, { incluir_inativos: incluirInativos }),
+      coletarTodasPaginas((o, l) =>
+        empresas.list({ rede_id: redeId, incluir_inativos: true, offset: o, limit: l }),
+      ),
     ])
-      .then(([r, e, f]) => {
+      .then(([r, e]) => {
         setRede(r)
         setEmpresasList(e)
-        setFuncionariosList(f)
       })
       .catch((err) => {
         if (!toastShownForLoadRef.current) {
@@ -97,9 +147,30 @@ export function RedeDetalhe() {
       .finally(() => setLoading(false))
   }
 
+  function loadFuncionarios() {
+    if (!redeId || isNaN(redeId)) return
+    setLoadingFuncionarios(true)
+    redes
+      .getFuncionarios(redeId, {
+        incluir_inativos: incluirInativos,
+        busca: debouncedBuscaFuncionarios || undefined,
+        offset: (pageFuncionarios - 1) * PAGE_SIZE_PADRAO,
+        limit: PAGE_SIZE_PADRAO,
+      })
+      .then(({ items, total }) => {
+        setFuncionariosList(items)
+        setFuncionariosTotal(total)
+      })
+      .finally(() => setLoadingFuncionarios(false))
+  }
+
   useEffect(() => {
-    load()
-  }, [redeId, incluirInativos])
+    loadRedeEEmpresas()
+  }, [redeId])
+
+  useEffect(() => {
+    loadFuncionarios()
+  }, [redeId, incluirInativos, pageFuncionarios, debouncedBuscaFuncionarios])
 
   useEffect(() => {
     if (id && !isNaN(redeId)) return
@@ -110,7 +181,7 @@ export function RedeDetalhe() {
   }, [id, redeId, navigate, toast])
 
   useEffect(() => {
-    tiposNegocio.list().then(setTiposNegocioList)
+    coletarTodasPaginas((o, l) => tiposNegocio.list({ incluir_inativos: true, offset: o, limit: l })).then(setTiposNegocioList)
   }, [])
 
   function openNovaEmpresa() {
@@ -136,7 +207,7 @@ export function RedeDetalhe() {
     setModalEmpresa(true)
   }
 
-  function openEditEmpresa(e: Awaited<ReturnType<typeof empresas.list>>[number]) {
+  function openEditEmpresa(e: Empresas.Empresa) {
     setEditingEmpresaId(e.id)
     setModoEmpresa('edit')
     setNomeEmpresa(e.nome)
@@ -159,7 +230,7 @@ export function RedeDetalhe() {
     setModalEmpresa(true)
   }
 
-  function openViewEmpresa(e: Awaited<ReturnType<typeof empresas.list>>[number]) {
+  function openViewEmpresa(e: Empresas.Empresa) {
     setEditingEmpresaId(e.id)
     setModoEmpresa('view')
     setNomeEmpresa(e.nome)
@@ -242,7 +313,8 @@ export function RedeDetalhe() {
         await empresas.create(payload)
       }
       setModalEmpresa(false)
-      load()
+      loadRedeEEmpresas()
+      loadFuncionarios()
     } catch (err) {
       setErrorEmpresa(err instanceof Error ? err.message : 'Erro')
     } finally {
@@ -254,26 +326,60 @@ export function RedeDetalhe() {
     if (!confirm('Excluir esta empresa?')) return
     try {
       await empresas.delete(empresaId)
-      load()
+      loadRedeEEmpresas()
+      loadFuncionarios()
     } catch (err) {
       toast.showWarning(err instanceof Error ? err.message : 'Erro ao excluir')
     }
   }
 
-  function openEditFuncionario(funcionarioId: number) {
-    navigate('/funcionarios-rede', { state: { editId: funcionarioId } })
+  function preencherFormFuncionario(f: FuncionarioListaItem) {
+    setNomeFuncionario(f.nome)
+    setEmailFuncionario(f.email)
+    setTipoFuncionario((f.tipo as TipoFuncionario) || 'colaborador')
+    setAtivoFuncionario(f.ativo)
+    setEmpresaIdFuncionario(f.empresa_id ?? '')
+    setEmpresaIdsFuncionario(f.empresa_ids ?? [])
+    setVinculadoFuncionarioView(f.vinculado_a ?? '')
+    setErrorFuncionario('')
+  }
+
+  function openViewFuncionario(f: FuncionarioListaItem) {
+    setEditingFuncionarioId(f.id)
+    setModoFuncionario('view')
+    preencherFormFuncionario(f)
+    setAba('funcionarios')
+    setModalFuncionario(true)
+  }
+
+  function openEditFuncionario(f: FuncionarioListaItem) {
+    setEditingFuncionarioId(f.id)
+    setModoFuncionario('edit')
+    preencherFormFuncionario(f)
+    setAba('funcionarios')
+    setModalFuncionario(true)
   }
 
   function openNovoFuncionario() {
+    setEditingFuncionarioId(null)
+    setModoFuncionario('create')
     setNomeFuncionario('')
     setEmailFuncionario('')
     setTipoFuncionario('colaborador')
     setAtivoFuncionario(true)
     setEmpresaIdFuncionario('')
     setEmpresaIdsFuncionario([])
+    setVinculadoFuncionarioView('')
     setErrorFuncionario('')
     setAba('funcionarios')
     setModalFuncionario(true)
+  }
+
+  function fecharModalFuncionario() {
+    setModalFuncionario(false)
+    setModoFuncionario('view')
+    setEditingFuncionarioId(null)
+    setVinculadoFuncionarioView('')
   }
 
   function toggleEmpresaFuncionario(id: number) {
@@ -304,7 +410,7 @@ export function RedeDetalhe() {
     }
     setSavingFuncionario(true)
     try {
-      await funcionariosRede.create({
+      const payload = {
         nome: nomeFuncionario.trim(),
         email: emailFuncionario.trim(),
         tipo: tipoFuncionario,
@@ -312,10 +418,17 @@ export function RedeDetalhe() {
         rede_id: tipoFuncionario === 'socio' ? redeId : undefined,
         empresa_id: tipoFuncionario === 'colaborador' ? Number(empresaIdFuncionario) : undefined,
         empresa_ids: tipoFuncionario === 'supervisor' ? empresaIdsFuncionario : undefined,
-      })
-      setModalFuncionario(false)
-      load()
-      toast.showSuccess('Funcionário cadastrado.')
+      }
+      if (editingFuncionarioId) {
+        await funcionariosRede.update(editingFuncionarioId, payload)
+        toast.showSuccess('Funcionário atualizado.')
+      } else {
+        await funcionariosRede.create(payload)
+        toast.showSuccess('Funcionário cadastrado.')
+      }
+      fecharModalFuncionario()
+      loadRedeEEmpresas()
+      loadFuncionarios()
     } catch (err) {
       setErrorFuncionario(err instanceof Error ? err.message : 'Erro ao salvar')
     } finally {
@@ -327,7 +440,8 @@ export function RedeDetalhe() {
     if (!confirm('Excluir este funcionário?')) return
     try {
       await funcionariosRede.delete(funcionarioId)
-      load()
+      loadRedeEEmpresas()
+      loadFuncionarios()
     } catch (err) {
       toast.showWarning(err instanceof Error ? err.message : 'Erro ao excluir')
     }
@@ -352,7 +466,10 @@ export function RedeDetalhe() {
   )
 
   const labelEmpresaModal = modoEmpresa === 'create' ? 'Nova empresa' : nomeEmpresa || 'Empresa'
+  const labelFuncionarioModal =
+    modoFuncionario === 'create' ? 'Novo funcionário' : nomeFuncionario || 'Funcionário'
   const isViewEmpresa = modoEmpresa === 'view'
+  const isViewFuncionario = modoFuncionario === 'view'
   const tipoNegocioNomeEmpresa =
     tipoNegocioIdEmpresa === '' ? '' : tiposNegocioList.find((t) => t.id === Number(tipoNegocioIdEmpresa))?.nome ?? ''
 
@@ -370,7 +487,7 @@ export function RedeDetalhe() {
                 setAba('empresas')
               }
               setModalEmpresa(false)
-              setModalFuncionario(false)
+              fecharModalFuncionario()
             }}
             className="font-medium text-slate-600 hover:text-slate-900"
           >
@@ -385,7 +502,7 @@ export function RedeDetalhe() {
           {modalFuncionario && (
             <>
               <span aria-hidden className="text-slate-300">/</span>
-              <span className="truncate font-semibold text-slate-800">Novo funcionário</span>
+              <span className="truncate font-semibold text-slate-800">{labelFuncionarioModal}</span>
             </>
           )}
         </nav>
@@ -610,18 +727,25 @@ export function RedeDetalhe() {
         <Card>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
             <h2 className="text-lg font-semibold text-slate-800">Empresas da rede</h2>
-            <div className="flex items-center gap-3">
-              <FiltroInativos incluirInativos={incluirInativos} onChange={setIncluirInativos} />
-              <Button onClick={openNovaEmpresa}>Nova empresa</Button>
-            </div>
+            <Button onClick={openNovaEmpresa}>Nova empresa</Button>
           </div>
+          <BarraBuscaPaginacao
+            busca={buscaEmpresas}
+            onBuscaChange={setBuscaEmpresas}
+            placeholder="Buscar empresa (nome, razão social, CNPJ...)"
+            page={pageEmpresas}
+            total={empresasFiltradas.length}
+            onPageChange={setPageEmpresas}
+            disabled={loading}
+            extra={<FiltroInativos incluirInativos={incluirInativos} onChange={setIncluirInativos} />}
+          />
           {loading && !empresasList.length ? (
             <p className="text-slate-500">Carregando...</p>
-          ) : empresasExibidas.length === 0 ? (
+          ) : empresasFiltradas.length === 0 ? (
             <p className="text-slate-500">Nenhuma empresa nesta rede.</p>
           ) : (
             <ul className="divide-y divide-slate-200">
-              {empresasExibidas.map((e) => (
+              {empresasPagina.map((e) => (
                 <li
                   key={e.id}
                   role="button"
@@ -650,98 +774,162 @@ export function RedeDetalhe() {
       )}
 
       {aba === 'funcionarios' && modalFuncionario && (
-        <Card title="Novo funcionário">
-          <p className="mb-4 text-sm text-slate-600">
-            Rede: <span className="font-medium text-slate-800">{rede.nome}</span> — o vínculo será apenas com empresas desta rede.
-          </p>
-          <form onSubmit={handleSubmitFuncionario} className="space-y-4">
-            {errorFuncionario && (
-              <div className="rounded bg-red-50 p-2 text-sm text-red-700">{errorFuncionario}</div>
-            )}
-            <Input
-              label="Nome *"
-              value={nomeFuncionario}
-              onChange={(e) => setNomeFuncionario(e.target.value)}
-              required
-            />
-            <Input
-              label="E-mail *"
-              type="email"
-              value={emailFuncionario}
-              onChange={(e) => setEmailFuncionario(e.target.value)}
-              required
-            />
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Tipo</label>
-              <select
-                value={tipoFuncionario}
-                onChange={(e) => {
-                  const t = e.target.value as TipoFuncionario
-                  setTipoFuncionario(t)
-                  setEmpresaIdFuncionario('')
-                  setEmpresaIdsFuncionario([])
-                }}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2"
-              >
-                <option value="socio">Sócio</option>
-                <option value="supervisor">Supervisor</option>
-                <option value="colaborador">Colaborador</option>
-              </select>
+        <Card
+          title={
+            isViewFuncionario
+              ? 'Detalhe do funcionário'
+              : modoFuncionario === 'edit'
+                ? 'Editar funcionário'
+                : 'Novo funcionário'
+          }
+        >
+          {isViewFuncionario ? (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <p className="text-xs font-medium text-slate-500">Nome</p>
+                  <p className="text-sm text-slate-900">{nomeFuncionario || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500">E-mail</p>
+                  <p className="text-sm text-slate-900 break-all">{emailFuncionario || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Tipo</p>
+                  <p className="text-sm text-slate-900">{tipoLabel[tipoFuncionario] ?? tipoFuncionario}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="text-xs font-medium text-slate-500">Vinculado a</p>
+                  <p className="text-sm text-slate-900">{vinculadoFuncionarioView || '—'}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between border-t border-slate-200 pt-4">
+                <span
+                  className={`rounded-md px-2 py-1 text-xs font-medium ${
+                    ativoFuncionario ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-700'
+                  }`}
+                >
+                  {ativoFuncionario ? 'Ativo' : 'Inativo'}
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      fecharModalFuncionario()
+                      setAba('funcionarios')
+                    }}
+                    aria-label="Voltar para a lista de funcionários"
+                    className="px-3"
+                  >
+                    <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="M15 18l-6-6 6-6" />
+                    </svg>
+                    Voltar
+                  </Button>
+                  <Button type="button" variant="primary" onClick={() => setModoFuncionario('edit')} className="px-3">
+                    <IconPencil ariaHidden={false} />
+                    Editar
+                  </Button>
+                </div>
+              </div>
             </div>
-            {tipoFuncionario === 'colaborador' && (
-              <SelectComPesquisa
-                id="rede-detalhe-func-empresa"
-                label="Empresa desta rede *"
-                value={empresaIdFuncionario}
-                onChange={(id) => setEmpresaIdFuncionario(id)}
-                required
-                items={empresasDaRedeParaVinculo.map((x) => ({
-                  id: x.id,
-                  label: x.nome,
-                  createdAt: x.created_at,
-                }))}
-                hint="Últimas empresas desta rede. Digite para buscar."
-              />
-            )}
-            {tipoFuncionario === 'supervisor' && (
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Empresas desta rede</label>
-                {empresasDaRedeParaVinculo.length === 0 ? (
-                  <p className="text-sm text-slate-500">Nenhuma empresa ativa nesta rede.</p>
-                ) : (
-                  <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 p-3">
-                    {empresasDaRedeParaVinculo.map((e) => (
-                      <label key={e.id} className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={empresaIdsFuncionario.includes(e.id)}
-                          onChange={() => toggleEmpresaFuncionario(e.id)}
-                        />
-                        <span>{e.nome}</span>
-                      </label>
-                    ))}
+          ) : (
+            <>
+              <p className="mb-4 text-sm text-slate-600">
+                Rede: <span className="font-medium text-slate-800">{rede.nome}</span> — o vínculo será apenas com empresas desta rede.
+              </p>
+              <form onSubmit={handleSubmitFuncionario} className="space-y-4">
+                {errorFuncionario && (
+                  <div className="rounded bg-red-50 p-2 text-sm text-red-700">{errorFuncionario}</div>
+                )}
+                <Input
+                  label="Nome *"
+                  value={nomeFuncionario}
+                  onChange={(e) => setNomeFuncionario(e.target.value)}
+                  required
+                />
+                <Input
+                  label="E-mail *"
+                  type="email"
+                  value={emailFuncionario}
+                  onChange={(e) => setEmailFuncionario(e.target.value)}
+                  required
+                />
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Tipo</label>
+                  <select
+                    value={tipoFuncionario}
+                    onChange={(e) => {
+                      const t = e.target.value as TipoFuncionario
+                      setTipoFuncionario(t)
+                      setEmpresaIdFuncionario('')
+                      setEmpresaIdsFuncionario([])
+                    }}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                  >
+                    <option value="socio">Sócio</option>
+                    <option value="supervisor">Supervisor</option>
+                    <option value="colaborador">Colaborador</option>
+                  </select>
+                </div>
+                {tipoFuncionario === 'colaborador' && (
+                  <SelectComPesquisa
+                    id="rede-detalhe-func-empresa"
+                    label="Empresa desta rede *"
+                    value={empresaIdFuncionario}
+                    onChange={(id) => setEmpresaIdFuncionario(id)}
+                    required
+                    items={empresasDaRedeParaVinculo.map((x) => ({
+                      id: x.id,
+                      label: x.nome,
+                      createdAt: x.created_at,
+                    }))}
+                    hint="Últimas empresas desta rede. Digite para buscar."
+                  />
+                )}
+                {tipoFuncionario === 'supervisor' && (
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">Empresas desta rede</label>
+                    {empresasDaRedeParaVinculo.length === 0 ? (
+                      <p className="text-sm text-slate-500">Nenhuma empresa ativa nesta rede.</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 p-3">
+                        {empresasDaRedeParaVinculo.map((e) => (
+                          <label key={e.id} className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={empresaIdsFuncionario.includes(e.id)}
+                              onChange={() => toggleEmpresaFuncionario(e.id)}
+                            />
+                            <span>{e.nome}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
-            <label className="flex items-center gap-2 text-sm text-slate-700">
-              <input
-                type="checkbox"
-                checked={ativoFuncionario}
-                onChange={(e) => setAtivoFuncionario(e.target.checked)}
-                className="rounded border-slate-300"
-              />
-              Ativo
-            </label>
-            <div className="flex gap-2 border-t border-slate-200 pt-2">
-              <Button type="submit" loading={savingFuncionario}>
-                Salvar
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => setModalFuncionario(false)}>
-                Cancelar
-              </Button>
-            </div>
-          </form>
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={ativoFuncionario}
+                    onChange={(e) => setAtivoFuncionario(e.target.checked)}
+                    className="rounded border-slate-300"
+                  />
+                  Ativo
+                </label>
+                <div className="flex gap-2 border-t border-slate-200 pt-2">
+                  <Button type="submit" loading={savingFuncionario}>
+                    Salvar
+                  </Button>
+                  <Button type="button" variant="secondary" onClick={() => fecharModalFuncionario()}>
+                    Cancelar
+                  </Button>
+                </div>
+              </form>
+            </>
+          )}
         </Card>
       )}
 
@@ -749,12 +937,19 @@ export function RedeDetalhe() {
         <Card>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
             <h2 className="text-lg font-semibold text-slate-800">Funcionários da rede</h2>
-            <div className="flex items-center gap-3">
-              <FiltroInativos incluirInativos={incluirInativos} onChange={setIncluirInativos} />
-              <Button onClick={openNovoFuncionario}>Novo funcionário</Button>
-            </div>
+            <Button onClick={openNovoFuncionario}>Novo funcionário</Button>
           </div>
-          {loading && !funcionariosList.length ? (
+          <BarraBuscaPaginacao
+            busca={buscaFuncionarios}
+            onBuscaChange={setBuscaFuncionarios}
+            placeholder="Buscar por nome ou e-mail"
+            page={pageFuncionarios}
+            total={funcionariosTotal}
+            onPageChange={setPageFuncionarios}
+            disabled={loadingFuncionarios}
+            extra={<FiltroInativos incluirInativos={incluirInativos} onChange={setIncluirInativos} />}
+          />
+          {loadingFuncionarios && !funcionariosList.length ? (
             <p className="text-slate-500">Carregando...</p>
           ) : funcionariosList.length === 0 ? (
             <p className="text-slate-500">Nenhum funcionário vinculado a esta rede.</p>
@@ -765,8 +960,8 @@ export function RedeDetalhe() {
                   key={f.id}
                   role="button"
                   tabIndex={0}
-                  onClick={() => openEditFuncionario(f.id)}
-                  onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openEditFuncionario(f.id); } }}
+                  onClick={() => openViewFuncionario(f)}
+                  onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openViewFuncionario(f); } }}
                   className="flex cursor-pointer items-center justify-between rounded-lg py-3 px-2 -mx-2 transition-colors duration-150 hover:bg-slate-50/80 focus:outline-none focus:bg-slate-50/80"
                 >
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -776,7 +971,7 @@ export function RedeDetalhe() {
                     <span className="text-slate-500">— {f.vinculado_a}</span>
                   </div>
                   <div className="flex shrink-0 gap-1.5" onClick={(ev) => ev.stopPropagation()}>
-                    <Button variant="ghost" onClick={() => openEditFuncionario(f.id)} aria-label="Editar funcionário">
+                    <Button variant="ghost" onClick={() => openEditFuncionario(f)} aria-label="Editar funcionário">
                       <IconPencil ariaHidden={false} />
                     </Button>
                     <Button variant="ghost" onClick={() => handleDeleteFuncionario(f.id)} aria-label="Excluir funcionário">

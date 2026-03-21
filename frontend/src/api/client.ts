@@ -58,19 +58,46 @@ function withParams(path: string, params?: Record<string, string | number | bool
   return s ? `${path}?${s}` : path;
 }
 
+/** Resposta padrão de listagens paginadas (backend ListaPaginada). */
+export type Paginated<T> = { items: T[]; total: number };
+
+/**
+ * Aceita tanto `{ items, total }` quanto array legado `[]` (API antiga),
+ * evitando tela em branco quando backend e frontend estão dessincronizados.
+ */
+export function normalizePaginated<T>(data: unknown): Paginated<T> {
+  if (Array.isArray(data)) {
+    return { items: data as T[], total: (data as T[]).length }
+  }
+  if (data && typeof data === 'object' && 'items' in data) {
+    const d = data as { items?: unknown; total?: unknown }
+    const items = Array.isArray(d.items) ? (d.items as T[]) : []
+    const total = typeof d.total === 'number' ? d.total : items.length
+    return { items, total }
+  }
+  return { items: [], total: 0 }
+}
+
+function listPaginated<T>(path: string, params?: Record<string, string | number | boolean | undefined>) {
+  return api<unknown>(withParams(path, params)).then((raw) => normalizePaginated<T>(raw))
+}
+
 export const redes = {
-  list: (params?: { incluir_inativos?: boolean }) => api<Redes.Rede[]>(withParams('/redes', params)),
+  list: (params?: { incluir_inativos?: boolean; busca?: string; offset?: number; limit?: number }) =>
+    listPaginated<Redes.Rede>('/redes', params),
   get: (id: number) => api<Redes.Rede>(`/redes/${id}`),
-  getFuncionarios: (redeId: number, params?: { incluir_inativos?: boolean }) =>
-    api<Redes.FuncionarioComVinculo[]>(withParams(`/redes/${redeId}/funcionarios`, params)),
+  getFuncionarios: (
+    redeId: number,
+    params?: { incluir_inativos?: boolean; busca?: string; offset?: number; limit?: number },
+  ) => listPaginated<Redes.FuncionarioComVinculo>(`/redes/${redeId}/funcionarios`, params),
   create: (data: Redes.Create) => api<Redes.Rede>('/redes', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: Redes.Update) => api<Redes.Rede>(`/redes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: number) => api<void>(`/redes/${id}`, { method: 'DELETE' }),
 };
 
 export const empresas = {
-  list: (params?: { rede_id?: number; incluir_inativos?: boolean }) =>
-    api<Empresas.Empresa[]>(withParams('/empresas', params)),
+  list: (params?: { rede_id?: number; incluir_inativos?: boolean; busca?: string; offset?: number; limit?: number }) =>
+    listPaginated<Empresas.Empresa>('/empresas', params),
   get: (id: number) => api<Empresas.Empresa>(`/empresas/${id}`),
   consultarCnpj: (cnpj: string) => api<Empresas.ConsultaCNPJ>(`/empresas/consultar-cnpj/${encodeURIComponent(cnpj.replace(/\D/g, ''))}`),
   create: (data: Empresas.Create) => api<Empresas.Empresa>('/empresas', { method: 'POST', body: JSON.stringify(data) }),
@@ -79,7 +106,8 @@ export const empresas = {
 };
 
 export const tiposNegocio = {
-  list: (params?: { incluir_inativos?: boolean }) => api<TiposNegocio.Tipo[]>(withParams('/tipos-negocio', params)),
+  list: (params?: { incluir_inativos?: boolean; busca?: string; offset?: number; limit?: number }) =>
+    listPaginated<TiposNegocio.Tipo>('/tipos-negocio', params),
   get: (id: number) => api<TiposNegocio.Tipo>(`/tipos-negocio/${id}`),
   create: (data: TiposNegocio.Create) => api<TiposNegocio.Tipo>('/tipos-negocio', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: TiposNegocio.Update) => api<TiposNegocio.Tipo>(`/tipos-negocio/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
@@ -87,7 +115,8 @@ export const tiposNegocio = {
 };
 
 export const setores = {
-  list: (params?: { incluir_inativos?: boolean }) => api<Setores.Setor[]>(withParams('/setores', params)),
+  list: (params?: { incluir_inativos?: boolean; busca?: string; offset?: number; limit?: number }) =>
+    listPaginated<Setores.Setor>('/setores', params),
   get: (id: number) => api<Setores.Setor>(`/setores/${id}`),
   create: (data: Setores.Create) => api<Setores.Setor>('/setores', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: Setores.Update) => api<Setores.Setor>(`/setores/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
@@ -95,7 +124,8 @@ export const setores = {
 };
 
 export const atendentes = {
-  list: (params?: { incluir_inativos?: boolean }) => api<Atendentes.Atendente[]>(withParams('/atendentes', params)),
+  list: (params?: { incluir_inativos?: boolean; busca?: string; offset?: number; limit?: number }) =>
+    listPaginated<Atendentes.Atendente>('/atendentes', params),
   me: () => api<Atendentes.Atendente>('/atendentes/me'),
   get: (id: number) => api<Atendentes.Atendente>(`/atendentes/${id}`),
   create: (data: Atendentes.Create) => api<Atendentes.Atendente>('/atendentes', { method: 'POST', body: JSON.stringify(data) }),
@@ -104,8 +134,15 @@ export const atendentes = {
 };
 
 export const funcionariosRede = {
-  list: (params?: { rede_id?: number; empresa_id?: number; tipo?: string; incluir_inativos?: boolean }) =>
-    api<FuncionariosRede.Funcionario[]>(withParams('/funcionarios-rede', params)),
+  list: (params?: {
+    rede_id?: number;
+    empresa_id?: number;
+    tipo?: string;
+    incluir_inativos?: boolean;
+    busca?: string;
+    offset?: number;
+    limit?: number;
+  }) => listPaginated<FuncionariosRede.Funcionario>('/funcionarios-rede', params),
   get: (id: number) => api<FuncionariosRede.Funcionario>(`/funcionarios-rede/${id}`),
   create: (data: FuncionariosRede.Create) => api<FuncionariosRede.Funcionario>('/funcionarios-rede', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: FuncionariosRede.Update) => api<FuncionariosRede.Funcionario>(`/funcionarios-rede/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
@@ -113,7 +150,8 @@ export const funcionariosRede = {
 };
 
 export const statusTicket = {
-  list: (params?: { incluir_inativos?: boolean }) => api<StatusTicket.Status[]>(withParams('/status-ticket', params)),
+  list: (params?: { incluir_inativos?: boolean; busca?: string; offset?: number; limit?: number }) =>
+    listPaginated<StatusTicket.Status>('/status-ticket', params),
   get: (id: number) => api<StatusTicket.Status>(`/status-ticket/${id}`),
   create: (data: StatusTicket.Create) => api<StatusTicket.Status>('/status-ticket', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: StatusTicket.Update) => api<StatusTicket.Status>(`/status-ticket/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
@@ -121,15 +159,25 @@ export const statusTicket = {
 };
 
 export const audit = {
-  list: (params?: { entity_type?: string; entity_id?: number }) =>
-    api<Audit.AuditLogEntry[]>(withParams('/audit', params)),
+  list: (params?: {
+    entity_type?: string;
+    entity_id?: number;
+    busca?: string;
+    offset?: number;
+    limit?: number;
+  }) => listPaginated<Audit.AuditLogEntry>('/audit', params),
 };
 
 export const tickets = {
-  list: (params?: { empresa_id?: number; setor_id?: number; status_id?: number; protocolo?: string }) => {
-    const q = new URLSearchParams(params as Record<string, string>).toString();
-    return api<Tickets.Ticket[]>(`/tickets${q ? `?${q}` : ''}`);
-  },
+  list: (params?: {
+    empresa_id?: number;
+    setor_id?: number;
+    status_id?: number;
+    protocolo?: string;
+    busca?: string;
+    offset?: number;
+    limit?: number;
+  }) => listPaginated<Tickets.Ticket>('/tickets', params),
   get: (id: number) => api<Tickets.Ticket>(`/tickets/${id}`),
   getHistorico: (id: number) => api<Tickets.Historico[]>(`/tickets/${id}/historico`),
   create: (data: Tickets.Create) => api<Tickets.Ticket>('/tickets', { method: 'POST', body: JSON.stringify(data) }),

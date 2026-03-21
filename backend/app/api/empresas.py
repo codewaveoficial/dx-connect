@@ -4,16 +4,21 @@ import urllib.error
 import json
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Empresa, Rede, Ticket, FuncionarioRede, FuncionarioRedeEmpresa
 from app.models.atendente import Atendente
 from app.schemas.empresa import EmpresaCreate, EmpresaUpdate, EmpresaRead, ConsultaCNPJResponse
+from app.schemas.lista_paginada import ListaPaginada
 from app.core.auth import exigir_admin, obter_atendente_atual
 from app.core.audit import registrar_audit
 
 router = APIRouter(prefix="/empresas", tags=["empresas"])
+
+_MAX_PAGE = 100
+_DEFAULT_PAGE = 20
 
 
 def _pode_ver_empresa(atendente: Atendente, empresa_id: int, db: Session) -> bool:
@@ -27,19 +32,35 @@ def _pode_ver_empresa(atendente: Atendente, empresa_id: int, db: Session) -> boo
     return False
 
 
-@router.get("", response_model=list[EmpresaRead])
+@router.get("", response_model=ListaPaginada[EmpresaRead])
 def listar_empresas(
     rede_id: int | None = Query(None),
     incluir_inativos: bool = Query(False, description="Incluir empresas inativas"),
+    busca: str | None = Query(None, description="Nome, razão social, fantasia, CNPJ ou e-mail"),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(_DEFAULT_PAGE, ge=1, le=_MAX_PAGE),
     db: Session = Depends(get_db),
     _: Atendente = Depends(obter_atendente_atual),
 ):
-    q = db.query(Empresa).order_by(Empresa.nome)
+    q = db.query(Empresa)
     if rede_id is not None:
         q = q.filter(Empresa.rede_id == rede_id)
     if not incluir_inativos:
         q = q.filter(Empresa.ativo.is_(True))
-    return q.all()
+    if busca and busca.strip():
+        term = f"%{busca.strip()}%"
+        q = q.filter(
+            or_(
+                Empresa.nome.ilike(term),
+                Empresa.razao_social.ilike(term),
+                Empresa.nome_fantasia.ilike(term),
+                Empresa.cnpj_cpf.ilike(term),
+                Empresa.email.ilike(term),
+            )
+        )
+    total = q.count()
+    items = q.order_by(Empresa.nome).offset(offset).limit(limit).all()
+    return ListaPaginada(items=items, total=total)
 
 
 def _digitos(s: str) -> str:

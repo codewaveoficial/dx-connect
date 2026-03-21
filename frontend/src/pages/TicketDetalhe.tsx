@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { tickets, statusTicket, atendentes } from '../api/client'
+import { coletarTodasPaginas } from '../api/collectPages'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 
@@ -19,8 +20,12 @@ export function TicketDetalhe() {
     if (!id) return
     tickets.get(Number(id)).then(setTicket).catch(() => setTicket(null))
     tickets.getHistorico(Number(id)).then(setHistorico).catch(() => setHistorico([]))
-    statusTicket.list().then(setStatusList)
-    atendentes.list().then(setAtendentesList)
+    coletarTodasPaginas((o, l) => statusTicket.list({ offset: o, limit: l })).then((rows) =>
+      setStatusList(rows.map((s) => ({ id: s.id, nome: s.nome }))),
+    )
+    coletarTodasPaginas((o, l) => atendentes.list({ offset: o, limit: l })).then((rows) =>
+      setAtendentesList(rows.map((a) => ({ id: a.id, nome: a.nome }))),
+    )
   }, [id])
 
   useEffect(() => {

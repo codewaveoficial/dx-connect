@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { empresas as apiEmpresas, redes, tiposNegocio } from '../api/client'
+import { empresas as apiEmpresas, redes, tiposNegocio, type Empresas, type Redes, type TiposNegocio } from '../api/client'
+import { coletarTodasPaginas } from '../api/collectPages'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -9,12 +10,17 @@ import { useToast } from '../components/ui/Toast'
 import { FiltroInativos } from '../components/ui/FiltroInativos'
 import { SelectComPesquisa } from '../components/ui/SelectComPesquisa'
 import { maskCnpjCpf, digitsOnly, isCnpj } from '../utils/maskCnpjCpf'
+import { BarraBuscaPaginacao, PAGE_SIZE_PADRAO } from '../components/ui/BarraBuscaPaginacao'
 
 export function Empresas() {
   const toast = useToast()
-  const [list, setList] = useState<Awaited<ReturnType<typeof apiEmpresas.list>>>([])
-  const [redesList, setRedesList] = useState<Awaited<ReturnType<typeof redes.list>>>([])
-  const [tiposList, setTiposList] = useState<Awaited<ReturnType<typeof tiposNegocio.list>>>([])
+  const [list, setList] = useState<Empresas.Empresa[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [busca, setBusca] = useState('')
+  const [debouncedBusca, setDebouncedBusca] = useState('')
+  const [redesList, setRedesList] = useState<Redes.Rede[]>([])
+  const [tiposList, setTiposList] = useState<TiposNegocio.Tipo[]>([])
   const [loading, setLoading] = useState(true)
   const [incluirInativos, setIncluirInativos] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
@@ -40,16 +46,39 @@ export function Empresas() {
   const [loadingCnpj, setLoadingCnpj] = useState(false)
   const [error, setError] = useState('')
 
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedBusca(busca.trim()), 400)
+    return () => clearTimeout(t)
+  }, [busca])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedBusca, incluirInativos])
+
   function load() {
     setLoading(true)
-    apiEmpresas.list({ incluir_inativos: incluirInativos }).then(setList).finally(() => setLoading(false))
+    apiEmpresas
+      .list({
+        incluir_inativos: incluirInativos,
+        busca: debouncedBusca || undefined,
+        offset: (page - 1) * PAGE_SIZE_PADRAO,
+        limit: PAGE_SIZE_PADRAO,
+      })
+      .then(({ items, total: t }) => {
+        setList(items)
+        setTotal(t)
+      })
+      .finally(() => setLoading(false))
   }
 
   useEffect(() => {
     load()
-    redes.list().then(setRedesList)
-    tiposNegocio.list().then(setTiposList)
-  }, [incluirInativos])
+  }, [page, debouncedBusca, incluirInativos])
+
+  useEffect(() => {
+    coletarTodasPaginas((o, l) => redes.list({ incluir_inativos: true, offset: o, limit: l })).then(setRedesList)
+    coletarTodasPaginas((o, l) => tiposNegocio.list({ incluir_inativos: true, offset: o, limit: l })).then(setTiposList)
+  }, [])
 
   function openCreate() {
     setEditingId(null)
@@ -77,7 +106,7 @@ export function Empresas() {
     setModalOpen(true)
   }
 
-  function openEdit(e: Awaited<ReturnType<typeof apiEmpresas.list>>[number]) {
+  function openEdit(e: Empresas.Empresa) {
     setEditingId(e.id)
     setRedeId(e.rede_id)
     setTipoNegocioId(e.tipo_negocio_id ?? '')
@@ -192,7 +221,8 @@ export function Empresas() {
       </div>
 
       {modalOpen && (
-        <Card title={editingId ? 'Editar empresa' : 'Nova empresa'}>
+        <div className="fixed inset-0 z-20 flex items-center justify-center overflow-y-auto bg-black/50 p-4">
+          <Card title={editingId ? 'Editar empresa' : 'Nova empresa'} className="w-full max-w-2xl">
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && <div className="rounded bg-red-50 p-2 text-sm text-red-700">{error}</div>}
 
@@ -279,18 +309,27 @@ export function Empresas() {
               <Button type="submit" loading={saving}>Salvar</Button>
               <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>Cancelar</Button>
             </div>
-          </form>
-        </Card>
+            </form>
+          </Card>
+        </div>
       )}
 
-      <Card>
-        <div className="mb-4 flex items-center justify-end">
-          <FiltroInativos incluirInativos={incluirInativos} onChange={setIncluirInativos} />
-        </div>
+      {!modalOpen && (
+        <Card>
+          <BarraBuscaPaginacao
+            busca={busca}
+            onBuscaChange={setBusca}
+            placeholder="Buscar por nome, razão social, CNPJ ou e-mail"
+            page={page}
+            total={total}
+            onPageChange={setPage}
+            disabled={loading}
+            extra={<FiltroInativos incluirInativos={incluirInativos} onChange={setIncluirInativos} />}
+          />
         {loading ? (
           <p className="text-slate-500">Carregando...</p>
         ) : list.length === 0 ? (
-          <p className="text-slate-500">Nenhuma empresa cadastrada.</p>
+          <p className="text-slate-500">Nenhuma empresa encontrada.</p>
         ) : (
           <ul className="divide-y divide-slate-200">
             {list.map((e) => (
@@ -318,7 +357,8 @@ export function Empresas() {
             ))}
           </ul>
         )}
-      </Card>
+        </Card>
+      )}
     </div>
   )
 }

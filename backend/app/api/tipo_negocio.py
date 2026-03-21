@@ -5,22 +5,34 @@ from app.database import get_db
 from app.models import TipoNegocio
 from app.models.atendente import Atendente
 from app.schemas.tipo_negocio import TipoNegocioCreate, TipoNegocioUpdate, TipoNegocioRead
+from app.schemas.lista_paginada import ListaPaginada
 from app.core.auth import obter_atendente_atual, exigir_admin
 from app.core.audit import registrar_audit
 
 router = APIRouter(prefix="/tipos-negocio", tags=["tipos-negocio"])
 
+_MAX_PAGE = 100
+_DEFAULT_PAGE = 20
 
-@router.get("", response_model=list[TipoNegocioRead])
+
+@router.get("", response_model=ListaPaginada[TipoNegocioRead])
 def listar(
     incluir_inativos: bool = Query(False, description="Incluir tipos inativos"),
+    busca: str | None = Query(None, description="Filtra por nome"),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(_DEFAULT_PAGE, ge=1, le=_MAX_PAGE),
     db: Session = Depends(get_db),
     _: Atendente = Depends(obter_atendente_atual),
 ):
-    q = db.query(TipoNegocio).order_by(TipoNegocio.nome)
+    q = db.query(TipoNegocio)
     if not incluir_inativos:
         q = q.filter(TipoNegocio.ativo.is_(True))
-    return q.all()
+    if busca and busca.strip():
+        term = f"%{busca.strip()}%"
+        q = q.filter(TipoNegocio.nome.ilike(term))
+    total = q.count()
+    items = q.order_by(TipoNegocio.nome).offset(offset).limit(limit).all()
+    return ListaPaginada(items=items, total=total)
 
 
 @router.post("", response_model=TipoNegocioRead, status_code=201)

@@ -16,6 +16,7 @@ import { StatusTicketPage } from './pages/StatusTicket'
 import { Auditoria } from './pages/Auditoria'
 import { TiposNegocio } from './pages/TiposNegocio'
 import { ToastProvider } from './components/ui/Toast'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -65,12 +66,14 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <ToastProvider>
-          <AppRoutes />
-        </ToastProvider>
-      </AuthProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <ToastProvider>
+            <AppRoutes />
+          </ToastProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   )
 }

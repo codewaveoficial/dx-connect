@@ -1,26 +1,39 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import StatusTicket
 from app.models.atendente import Atendente
 from app.schemas.status_ticket import StatusTicketCreate, StatusTicketUpdate, StatusTicketRead
+from app.schemas.lista_paginada import ListaPaginada
 from app.core.auth import obter_atendente_atual, exigir_admin
 from app.core.audit import registrar_audit
 
 router = APIRouter(prefix="/status-ticket", tags=["status-ticket"])
 
+_MAX_PAGE = 100
+_DEFAULT_PAGE = 20
 
-@router.get("", response_model=list[StatusTicketRead])
+
+@router.get("", response_model=ListaPaginada[StatusTicketRead])
 def listar(
     incluir_inativos: bool = Query(False, description="Incluir status inativos"),
+    busca: str | None = Query(None, description="Filtra por nome ou slug"),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(_DEFAULT_PAGE, ge=1, le=_MAX_PAGE),
     db: Session = Depends(get_db),
     _: Atendente = Depends(obter_atendente_atual),
 ):
-    q = db.query(StatusTicket).order_by(StatusTicket.ordem, StatusTicket.nome)
+    q = db.query(StatusTicket)
     if not incluir_inativos:
         q = q.filter(StatusTicket.ativo.is_(True))
-    return q.all()
+    if busca and busca.strip():
+        term = f"%{busca.strip()}%"
+        q = q.filter(or_(StatusTicket.nome.ilike(term), StatusTicket.slug.ilike(term)))
+    total = q.count()
+    items = q.order_by(StatusTicket.ordem, StatusTicket.nome).offset(offset).limit(limit).all()
+    return ListaPaginada(items=items, total=total)
 
 
 @router.post("", response_model=StatusTicketRead, status_code=201)

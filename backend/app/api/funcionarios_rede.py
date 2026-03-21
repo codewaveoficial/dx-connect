@@ -1,14 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import FuncionarioRede, FuncionarioRedeEmpresa, Ticket, Empresa
 from app.models.atendente import Atendente
 from app.schemas.funcionario_rede import FuncionarioRedeCreate, FuncionarioRedeUpdate, FuncionarioRedeRead
+from app.schemas.lista_paginada import ListaPaginada
 from app.core.auth import exigir_admin
 from app.core.audit import registrar_audit
 
 router = APIRouter(prefix="/funcionarios-rede", tags=["funcionarios-rede"])
+
+_MAX_PAGE = 100
+_DEFAULT_PAGE = 20
 
 
 def _para_read(f: FuncionarioRede) -> FuncionarioRedeRead:
@@ -27,16 +32,19 @@ def _para_read(f: FuncionarioRede) -> FuncionarioRedeRead:
     )
 
 
-@router.get("", response_model=list[FuncionarioRedeRead])
+@router.get("", response_model=ListaPaginada[FuncionarioRedeRead])
 def listar(
     rede_id: int | None = Query(None),
     empresa_id: int | None = Query(None),
     tipo: str | None = Query(None),
     incluir_inativos: bool = Query(False, description="Incluir funcionários inativos"),
+    busca: str | None = Query(None, description="Filtra por nome ou e-mail"),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(_DEFAULT_PAGE, ge=1, le=_MAX_PAGE),
     db: Session = Depends(get_db),
     _: Atendente = Depends(exigir_admin),
 ):
-    q = db.query(FuncionarioRede).order_by(FuncionarioRede.nome)
+    q = db.query(FuncionarioRede)
     if rede_id is not None:
         q = q.filter(FuncionarioRede.rede_id == rede_id)
     if empresa_id is not None:
@@ -52,7 +60,12 @@ def listar(
         q = q.filter(FuncionarioRede.tipo == tipo)
     if not incluir_inativos:
         q = q.filter(FuncionarioRede.ativo.is_(True))
-    return [_para_read(f) for f in q.all()]
+    if busca and busca.strip():
+        term = f"%{busca.strip()}%"
+        q = q.filter(or_(FuncionarioRede.nome.ilike(term), FuncionarioRede.email.ilike(term)))
+    total = q.count()
+    rows = q.order_by(FuncionarioRede.nome).offset(offset).limit(limit).all()
+    return ListaPaginada(items=[_para_read(f) for f in rows], total=total)
 
 
 @router.post("", response_model=FuncionarioRedeRead, status_code=201)

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { tickets, empresas, setores } from '../api/client'
+import { coletarTodasPaginas } from '../api/collectPages'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -17,8 +18,12 @@ export function TicketNovo() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    empresas.list().then((e) => setEmpresasList(e))
-    setores.list().then((s) => setSetoresList(s))
+    coletarTodasPaginas((o, l) => empresas.list({ offset: o, limit: l })).then((e) =>
+      setEmpresasList(e.map((x) => ({ id: x.id, nome: x.nome }))),
+    )
+    coletarTodasPaginas((o, l) => setores.list({ offset: o, limit: l })).then((s) =>
+      setSetoresList(s.map((x) => ({ id: x.id, nome: x.nome }))),
+    )
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {

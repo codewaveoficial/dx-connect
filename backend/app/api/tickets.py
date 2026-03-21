@@ -5,9 +5,13 @@ from sqlalchemy import or_
 from app.database import get_db
 from app.models import Ticket, TicketHistorico, Empresa, Setor, StatusTicket, Atendente
 from app.schemas.ticket import TicketCreate, TicketUpdate, TicketRead, TicketHistoricoRead
+from app.schemas.lista_paginada import ListaPaginada
 from app.core.auth import obter_atendente_atual, exigir_admin
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
+
+_MAX_PAGE = 100
+_DEFAULT_PAGE = 20
 
 
 def _gerar_protocolo(db: Session) -> str:
@@ -45,12 +49,15 @@ def _pode_ver_ticket(atendente: Atendente, ticket: Ticket) -> bool:
     return ticket.setor_id in setor_ids
 
 
-@router.get("", response_model=list[TicketRead])
+@router.get("", response_model=ListaPaginada[TicketRead])
 def listar(
     empresa_id: int | None = Query(None),
     setor_id: int | None = Query(None),
     status_id: int | None = Query(None),
-    protocolo: str | None = Query(None),
+    protocolo: str | None = Query(None, description="Legado: use busca"),
+    busca: str | None = Query(None, description="Protocolo, assunto ou nome da empresa"),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(_DEFAULT_PAGE, ge=1, le=_MAX_PAGE),
     db: Session = Depends(get_db),
     atendente: Atendente = Depends(obter_atendente_atual),
 ):
@@ -64,10 +71,20 @@ def listar(
         q = q.filter(Ticket.setor_id == setor_id)
     if status_id is not None:
         q = q.filter(Ticket.status_id == status_id)
-    if protocolo:
-        q = q.filter(Ticket.protocolo.ilike(f"%{protocolo}%"))
-    q = q.order_by(Ticket.created_at.desc())
-    return [_ticket_para_read(t) for t in q.all()]
+    if protocolo and protocolo.strip():
+        q = q.filter(Ticket.protocolo.ilike(f"%{protocolo.strip()}%"))
+    if busca and busca.strip():
+        term = f"%{busca.strip()}%"
+        q = q.filter(
+            or_(
+                Ticket.protocolo.ilike(term),
+                Ticket.assunto.ilike(term),
+                Empresa.nome.ilike(term),
+            )
+        )
+    total = q.count()
+    rows = q.order_by(Ticket.created_at.desc()).offset(offset).limit(limit).all()
+    return ListaPaginada(items=[_ticket_para_read(t) for t in rows], total=total)
 
 
 @router.post("", response_model=TicketRead, status_code=201)

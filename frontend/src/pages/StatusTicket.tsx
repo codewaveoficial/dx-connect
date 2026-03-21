@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react'
-import { statusTicket } from '../api/client'
+import { statusTicket, type StatusTicket } from '../api/client'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { IconPencil } from '../components/ui/IconPencil'
 import { FiltroInativos } from '../components/ui/FiltroInativos'
+import { BarraBuscaPaginacao, PAGE_SIZE_PADRAO } from '../components/ui/BarraBuscaPaginacao'
 
 export function StatusTicketPage() {
-  const [list, setList] = useState<Awaited<ReturnType<typeof statusTicket.list>>>([])
+  const [list, setList] = useState<StatusTicket.Status[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [busca, setBusca] = useState('')
+  const [debouncedBusca, setDebouncedBusca] = useState('')
   const [loading, setLoading] = useState(true)
   const [incluirInativos, setIncluirInativos] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
@@ -19,26 +24,46 @@ export function StatusTicketPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedBusca(busca.trim()), 400)
+    return () => clearTimeout(t)
+  }, [busca])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedBusca, incluirInativos])
+
   function load() {
     setLoading(true)
-    statusTicket.list({ incluir_inativos: incluirInativos }).then(setList).finally(() => setLoading(false))
+    statusTicket
+      .list({
+        incluir_inativos: incluirInativos,
+        busca: debouncedBusca || undefined,
+        offset: (page - 1) * PAGE_SIZE_PADRAO,
+        limit: PAGE_SIZE_PADRAO,
+      })
+      .then(({ items, total: t }) => {
+        setList(items)
+        setTotal(t)
+      })
+      .finally(() => setLoading(false))
   }
 
   useEffect(() => {
     load()
-  }, [incluirInativos])
+  }, [page, debouncedBusca, incluirInativos])
 
   function openCreate() {
     setEditingId(null)
     setNome('')
     setSlug('')
-    setOrdem(list.length)
+    setOrdem(total)
     setAtivo(true)
     setError('')
     setModalOpen(true)
   }
 
-  function openEdit(item: Awaited<ReturnType<typeof statusTicket.list>>[0]) {
+  function openEdit(item: StatusTicket.Status) {
     setEditingId(item.id)
     setNome(item.nome)
     setSlug(item.slug)
@@ -73,14 +98,22 @@ export function StatusTicketPage() {
         <h1 className="text-2xl font-bold text-slate-800">Status de ticket</h1>
         <Button onClick={openCreate}>Novo status</Button>
       </div>
-      <Card>
-        <div className="mb-4 flex items-center justify-end">
-          <FiltroInativos incluirInativos={incluirInativos} onChange={setIncluirInativos} />
-        </div>
+      {!modalOpen && (
+        <Card>
+          <BarraBuscaPaginacao
+            busca={busca}
+            onBuscaChange={setBusca}
+            placeholder="Buscar por nome ou slug"
+            page={page}
+            total={total}
+            onPageChange={setPage}
+            disabled={loading}
+            extra={<FiltroInativos incluirInativos={incluirInativos} onChange={setIncluirInativos} />}
+          />
         {loading ? (
           <p className="text-slate-500">Carregando...</p>
         ) : list.length === 0 ? (
-          <p className="text-slate-500">Nenhum status cadastrado.</p>
+          <p className="text-slate-500">Nenhum status encontrado.</p>
         ) : (
           <ul className="divide-y divide-slate-200">
             {list.map((s) => (
@@ -105,7 +138,8 @@ export function StatusTicketPage() {
             ))}
           </ul>
         )}
-      </Card>
+        </Card>
+      )}
 
       {modalOpen && (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4">

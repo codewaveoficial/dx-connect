@@ -7,22 +7,34 @@ from app.models import Rede, Empresa, FuncionarioRede, FuncionarioRedeEmpresa
 from app.models.atendente import Atendente
 from app.schemas.rede import RedeCreate, RedeUpdate, RedeRead
 from app.schemas.funcionario_rede import FuncionarioRedeComVinculo
+from app.schemas.lista_paginada import ListaPaginada
 from app.core.auth import obter_atendente_atual, exigir_admin
 from app.core.audit import registrar_audit
 
 router = APIRouter(prefix="/redes", tags=["redes"])
 
+_MAX_PAGE = 100
+_DEFAULT_PAGE = 20
 
-@router.get("", response_model=list[RedeRead])
+
+@router.get("", response_model=ListaPaginada[RedeRead])
 def listar_redes(
     incluir_inativos: bool = Query(False, description="Incluir redes inativas"),
+    busca: str | None = Query(None, description="Filtra por nome"),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(_DEFAULT_PAGE, ge=1, le=_MAX_PAGE),
     db: Session = Depends(get_db),
     _: Atendente = Depends(exigir_admin),
 ):
-    q = db.query(Rede).order_by(Rede.nome)
+    q = db.query(Rede)
     if not incluir_inativos:
         q = q.filter(Rede.ativo.is_(True))
-    return q.all()
+    if busca and busca.strip():
+        term = f"%{busca.strip()}%"
+        q = q.filter(Rede.nome.ilike(term))
+    total = q.count()
+    items = q.order_by(Rede.nome).offset(offset).limit(limit).all()
+    return ListaPaginada(items=items, total=total)
 
 
 @router.post("", response_model=RedeRead, status_code=201)
@@ -40,10 +52,13 @@ def criar_rede(
     return rede
 
 
-@router.get("/{rede_id}/funcionarios", response_model=list[FuncionarioRedeComVinculo])
+@router.get("/{rede_id}/funcionarios", response_model=ListaPaginada[FuncionarioRedeComVinculo])
 def listar_funcionarios_da_rede(
     rede_id: int,
     incluir_inativos: bool = Query(False, description="Incluir funcionários inativos"),
+    busca: str | None = Query(None, description="Filtra por nome ou e-mail"),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(_DEFAULT_PAGE, ge=1, le=_MAX_PAGE),
     db: Session = Depends(get_db),
     _: Atendente = Depends(exigir_admin),
 ):
@@ -70,8 +85,13 @@ def listar_funcionarios_da_rede(
     )
     if not incluir_inativos:
         q = q.filter(FuncionarioRede.ativo.is_(True))
+    if busca and busca.strip():
+        term = f"%{busca.strip()}%"
+        q = q.filter(or_(FuncionarioRede.nome.ilike(term), FuncionarioRede.email.ilike(term)))
+    total = q.count()
+    rows = q.offset(offset).limit(limit).all()
     result = []
-    for f in q.all():
+    for f in rows:
         if f.tipo == "socio":
             vinculado_a = "Sócio da rede"
         elif f.tipo == "colaborador" and f.empresa_id:
@@ -101,7 +121,7 @@ def listar_funcionarios_da_rede(
                 vinculado_a=vinculado_a,
             )
         )
-    return result
+    return ListaPaginada(items=result, total=total)
 
 
 @router.get("/{rede_id}", response_model=RedeRead)
