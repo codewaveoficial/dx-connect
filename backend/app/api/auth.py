@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -11,7 +12,10 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/login", response_model=Token)
 def login(data: AtendenteLogin, db: Session = Depends(get_db)):
-    atendente = db.query(Atendente).filter(Atendente.email == data.email).first()
+    email_login = data.email.strip().lower()
+    atendente = (
+        db.query(Atendente).filter(func.lower(Atendente.email) == email_login).first()
+    )
     if not atendente or not atendente.ativo:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="E-mail ou senha inválidos")
     if not verificar_senha(data.senha, atendente.senha_hash):

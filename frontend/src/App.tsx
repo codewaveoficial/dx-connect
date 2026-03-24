@@ -9,9 +9,11 @@ import { TicketDetalhe } from './pages/TicketDetalhe'
 import { Redes } from './pages/Redes'
 import { RedeDetalhe } from './pages/RedeDetalhe'
 import { Empresas } from './pages/Empresas'
+import { EmpresaDetalhe } from './pages/EmpresaDetalhe'
 import { Setores } from './pages/Setores'
 import { Atendentes } from './pages/Atendentes'
 import { FuncionariosRede } from './pages/FuncionariosRede'
+import { FuncionarioRedeDetalhe } from './pages/FuncionarioRedeDetalhe'
 import { StatusTicketPage } from './pages/StatusTicket'
 import { Auditoria } from './pages/Auditoria'
 import { TiposNegocio } from './pages/TiposNegocio'
@@ -51,9 +53,11 @@ function AppRoutes() {
         <Route path="tickets/:id" element={<TicketDetalhe />} />
         <Route path="redes/:id" element={<RedeDetalhe />} />
         <Route path="redes" element={<Redes />} />
+        <Route path="empresas/:id" element={<EmpresaDetalhe />} />
         <Route path="empresas" element={<Empresas />} />
         <Route path="setores" element={<Setores />} />
         <Route path="atendentes" element={<Atendentes />} />
+        <Route path="funcionarios-rede/:id" element={<FuncionarioRedeDetalhe />} />
         <Route path="funcionarios-rede" element={<FuncionariosRede />} />
         <Route path="status-ticket" element={<StatusTicketPage />} />
         <Route path="auditoria" element={<Auditoria />} />

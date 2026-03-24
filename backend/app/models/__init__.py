@@ -5,7 +5,7 @@ from app.models.atendente import Atendente, AtendenteSetor
 from app.models.setor import Setor
 from app.models.funcionario_rede import FuncionarioRede, FuncionarioRedeEmpresa
 from app.models.status_ticket import StatusTicket
-from app.models.ticket import Ticket, TicketHistorico
+from app.models.ticket import Ticket, TicketHistorico, TicketMensagem
 from app.models.audit_log import AuditLog
 
 __all__ = [
@@ -20,5 +20,6 @@ __all__ = [
     "StatusTicket",
     "Ticket",
     "TicketHistorico",
+    "TicketMensagem",
     "AuditLog",
 ]

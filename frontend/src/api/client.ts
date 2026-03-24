@@ -1,3 +1,5 @@
+import { mensagemErroApi } from './errorMessage'
+
 const BASE = import.meta.env.DEV ? '/api' : (import.meta.env.VITE_API_URL ?? 'http://localhost:8000');
 
 function getToken(): string | null {
@@ -22,19 +24,21 @@ export async function api<T>(
   // apenas devolver a mensagem para o formulário exibir via toast.
   if (res.status === 401 && path.startsWith('/auth/login')) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail ?? err.message ?? 'E-mail ou senha inválidos');
+    let msg = mensagemErroApi(err, 401);
+    if (msg.startsWith('Não foi possível concluir')) msg = 'E-mail ou senha inválidos.';
+    throw new Error(msg);
   }
 
   if (res.status === 401) {
     const err = await res.json().catch(() => ({}));
     localStorage.removeItem('token');
     window.location.href = '/login';
-    throw new Error(err.detail ?? err.message ?? 'Não autorizado');
+    throw new Error(mensagemErroApi(err, 401));
   }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail ?? err.message ?? `Erro ${res.status}`);
+    throw new Error(mensagemErroApi(err, res.status));
   }
   if (res.status === 204) return undefined as T;
   return res.json();
@@ -180,6 +184,9 @@ export const tickets = {
   }) => listPaginated<Tickets.Ticket>('/tickets', params),
   get: (id: number) => api<Tickets.Ticket>(`/tickets/${id}`),
   getHistorico: (id: number) => api<Tickets.Historico[]>(`/tickets/${id}/historico`),
+  listMensagens: (id: number) => api<Tickets.Mensagem[]>(`/tickets/${id}/mensagens`),
+  addMensagem: (id: number, data: Tickets.MensagemCreate) =>
+    api<Tickets.Mensagem>(`/tickets/${id}/mensagens`, { method: 'POST', body: JSON.stringify(data) }),
   create: (data: Tickets.Create) => api<Tickets.Ticket>('/tickets', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: Tickets.Update) => api<Tickets.Ticket>(`/tickets/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 };
@@ -379,6 +386,8 @@ export namespace FuncionariosRede {
     rede_id?: number;
     empresa_id?: number;
     empresa_ids: number[];
+    created_at?: string | null;
+    updated_at?: string | null;
   }
   export interface Create {
     nome: string;
@@ -445,6 +454,7 @@ export namespace Tickets {
     id: number;
     ticket_id: number;
     atendente_id?: number;
+    atendente_nome?: string | null;
     campo: string;
     valor_antigo?: string;
     valor_novo?: string;
@@ -457,12 +467,27 @@ export namespace Tickets {
     descricao?: string;
     aberto_por_id?: number;
   }
+  export type MensagemTipo = 'abertura' | 'publico' | 'interno';
+
+  export interface Mensagem {
+    id: number;
+    ticket_id: number;
+    atendente_id?: number | null;
+    atendente_nome?: string | null;
+    tipo: MensagemTipo | string;
+    corpo: string;
+    created_at: string;
+  }
+
+  export interface MensagemCreate {
+    corpo: string;
+    tipo: 'publico' | 'interno';
+  }
+
   export interface Update {
     setor_id?: number;
     status_id?: number;
-    atendente_id?: number;
-    assunto?: string;
-    descricao?: string;
+    atendente_id?: number | null;
   }
 }
 

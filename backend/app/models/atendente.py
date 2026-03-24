@@ -34,6 +34,7 @@ class Atendente(Base):
     )
     tickets_atendidos = relationship("Ticket", back_populates="atendente")
     historicos = relationship("TicketHistorico", back_populates="atendente")
+    ticket_mensagens = relationship("TicketMensagem", back_populates="atendente")
 
 
 # Alias para uso nos models (Setor usa "atendente_setor" como secondary string)

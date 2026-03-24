@@ -6,6 +6,7 @@ import { Input } from '../components/ui/Input'
 import { IconPencil } from '../components/ui/IconPencil'
 import { FiltroInativos } from '../components/ui/FiltroInativos'
 import { BarraBuscaPaginacao, PAGE_SIZE_PADRAO } from '../components/ui/BarraBuscaPaginacao'
+import { Switch } from '../components/ui/Switch'
 
 export function StatusTicketPage() {
   const [list, setList] = useState<StatusTicket.Status[]>([])
@@ -149,10 +150,7 @@ export function StatusTicketPage() {
               <Input label="Nome" value={nome} onChange={(e) => setNome(e.target.value)} required />
               <Input label="Slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="ex: aberto" required />
               <Input label="Ordem" type="number" value={ordem} onChange={(e) => setOrdem(Number(e.target.value))} />
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} className="rounded border-slate-300" />
-                Ativo
-              </label>
+              <Switch checked={ativo} onCheckedChange={setAtivo} label="Ativo" />
               <div className="flex gap-2">
                 <Button type="submit" loading={saving}>Salvar</Button>
                 <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>Cancelar</Button>

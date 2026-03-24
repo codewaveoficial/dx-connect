@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { audit, type Audit } from '../api/client'
 import { Card } from '../components/ui/Card'
 import { BarraBuscaPaginacao, PAGE_SIZE_PADRAO } from '../components/ui/BarraBuscaPaginacao'
+import { Select } from '../components/ui/Select'
 
 const entityTypeLabel: Record<string, string> = {
   rede: 'Rede',
@@ -73,21 +74,17 @@ export function Auditoria() {
           onPageChange={setPage}
           disabled={loading}
           extra={
-            <label className="flex items-center gap-2 text-sm text-slate-600">
-              <span>Tipo:</span>
-              <select
+            <div className="w-full min-w-0 sm:w-auto sm:min-w-[220px]">
+              <Select
+                label="Tipo"
                 value={filtroTipo}
-                onChange={(e) => setFiltroTipo(e.target.value)}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              >
-                <option value="">Todos</option>
-                {Object.entries(entityTypeLabel).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </label>
+                onChange={(v) => setFiltroTipo(typeof v === 'string' ? v : String(v))}
+                options={Object.entries(entityTypeLabel).map(([k, v]) => ({ value: k, label: v }))}
+                includeEmpty
+                emptyLabel="Todos"
+                placeholder="Todos"
+              />
+            </div>
           }
         />
         {loading ? (

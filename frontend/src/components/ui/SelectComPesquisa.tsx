@@ -88,7 +88,7 @@ export function SelectComPesquisa({
         aria-expanded={open}
         aria-controls={listId}
         onClick={() => !disabled && setOpen((o) => !o)}
-        className="flex w-full items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-800 transition-colors hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex w-full items-center justify-between rounded-xl border-0 bg-white px-3 py-2 text-left text-sm text-slate-800 shadow-sm ring-1 ring-slate-200/90 transition-[box-shadow,ring] hover:ring-slate-300/80 focus:outline-none focus:ring-2 focus:ring-slate-400/35 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <span className={!selectedLabel ? 'text-slate-400' : ''}>
           {selectedLabel || placeholder}
@@ -99,7 +99,7 @@ export function SelectComPesquisa({
       </button>
       {open && (
         <div
-          className="absolute z-30 mt-1 w-full rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+          className="absolute z-30 mt-1.5 w-full overflow-hidden rounded-xl border border-slate-200/95 bg-white py-1.5 shadow-xl shadow-slate-200/50 ring-1 ring-slate-900/[0.04]"
           role="listbox"
           id={listId}
         >
@@ -123,7 +123,7 @@ export function SelectComPesquisa({
                     type="button"
                     role="option"
                     aria-selected={value === it.id}
-                    className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-slate-50/80 ${value === it.id ? 'bg-slate-50 font-medium text-slate-900' : 'text-slate-700'}`}
+                    className={`mx-1 w-[calc(100%-0.5rem)] rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-slate-50/80 ${value === it.id ? 'bg-slate-100/90 font-medium text-slate-900' : 'text-slate-700'}`}
                     onClick={() => {
                       onChange(it.id)
                       setOpen(false)

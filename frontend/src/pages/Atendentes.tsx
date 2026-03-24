@@ -7,6 +7,9 @@ import { Input } from '../components/ui/Input'
 import { IconPencil } from '../components/ui/IconPencil'
 import { FiltroInativos } from '../components/ui/FiltroInativos'
 import { BarraBuscaPaginacao, PAGE_SIZE_PADRAO } from '../components/ui/BarraBuscaPaginacao'
+import { Switch } from '../components/ui/Switch'
+import { CheckboxField } from '../components/ui/CheckboxField'
+import { Select } from '../components/ui/Select'
 
 export function Atendentes() {
   const [list, setList] = useState<Atendentes.Atendente[]>([])
@@ -58,7 +61,9 @@ export function Atendentes() {
   }, [page, debouncedBusca, incluirInativos])
 
   useEffect(() => {
-    coletarTodasPaginas((o, l) => setores.list({ incluir_inativos: true, offset: o, limit: l })).then(setSetoresList)
+    coletarTodasPaginas<Setores.Setor>((o, l) =>
+      setores.list({ incluir_inativos: true, offset: o, limit: l }),
+    ).then(setSetoresList)
   }, [])
 
   function openCreate() {
@@ -186,34 +191,32 @@ export function Atendentes() {
                 onChange={(e) => setSenha(e.target.value)}
                 required={!editingId}
               />
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Perfil</label>
-                <select value={role} onChange={(e) => setRole(e.target.value as 'admin' | 'atendente')} className="w-full rounded-lg border border-slate-300 px-3 py-2">
-                  <option value="atendente">Atendente</option>
-                  <option value="admin">Administrador</option>
-                </select>
-              </div>
+              <Select
+                label="Perfil"
+                value={role}
+                onChange={(v) => setRole(v === 'admin' ? 'admin' : 'atendente')}
+                options={[
+                  { value: 'atendente', label: 'Atendente' },
+                  { value: 'admin', label: 'Administrador' },
+                ]}
+              />
               {role === 'atendente' && (
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">Setores</label>
                   <div className="flex flex-wrap gap-2">
                     {setoresList.map((s) => (
-                      <label key={s.id} className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={setorIds.includes(s.id)}
-                          onChange={() => toggleSetor(s.id)}
-                        />
-                        <span>{s.nome}</span>
-                      </label>
+                      <CheckboxField
+                        key={s.id}
+                        checked={setorIds.includes(s.id)}
+                        onChange={() => toggleSetor(s.id)}
+                      >
+                        {s.nome}
+                      </CheckboxField>
                     ))}
                   </div>
                 </div>
               )}
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} className="rounded border-slate-300" />
-                Ativo
-              </label>
+              <Switch checked={ativo} onCheckedChange={setAtivo} label="Usuário ativo" description="Inativos não acessam o sistema." />
               <div className="flex gap-2">
                 <Button type="submit" loading={saving}>Salvar</Button>
                 <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>Cancelar</Button>

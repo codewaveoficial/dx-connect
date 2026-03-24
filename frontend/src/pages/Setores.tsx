@@ -8,6 +8,7 @@ import { IconTrash } from '../components/ui/IconTrash'
 import { useToast } from '../components/ui/Toast'
 import { FiltroInativos } from '../components/ui/FiltroInativos'
 import { BarraBuscaPaginacao, PAGE_SIZE_PADRAO } from '../components/ui/BarraBuscaPaginacao'
+import { Switch } from '../components/ui/Switch'
 
 export function Setores() {
   const toast = useToast()
@@ -162,10 +163,7 @@ export function Setores() {
               {error && <div className="rounded bg-red-50 p-2 text-sm text-red-700">{error}</div>}
               <Input label="Nome" value={nome} onChange={(e) => setNome(e.target.value)} required />
               <Input label="Slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="ex: suporte" required />
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} className="rounded border-slate-300" />
-                Ativo
-              </label>
+              <Switch checked={ativo} onCheckedChange={setAtivo} label="Ativo" />
               <div className="flex gap-2">
                 <Button type="submit" loading={saving}>Salvar</Button>
                 <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>Cancelar</Button>

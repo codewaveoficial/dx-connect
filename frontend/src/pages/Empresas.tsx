@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { empresas as apiEmpresas, redes, tiposNegocio, type Empresas, type Redes, type TiposNegocio } from '../api/client'
 import { coletarTodasPaginas } from '../api/collectPages'
 import { Card } from '../components/ui/Card'
@@ -9,10 +10,14 @@ import { IconTrash } from '../components/ui/IconTrash'
 import { useToast } from '../components/ui/Toast'
 import { FiltroInativos } from '../components/ui/FiltroInativos'
 import { SelectComPesquisa } from '../components/ui/SelectComPesquisa'
+import { Select } from '../components/ui/Select'
 import { maskCnpjCpf, digitsOnly, isCnpj } from '../utils/maskCnpjCpf'
 import { BarraBuscaPaginacao, PAGE_SIZE_PADRAO } from '../components/ui/BarraBuscaPaginacao'
+import { Switch } from '../components/ui/Switch'
 
 export function Empresas() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const toast = useToast()
   const [list, setList] = useState<Empresas.Empresa[]>([])
   const [total, setTotal] = useState(0)
@@ -76,8 +81,12 @@ export function Empresas() {
   }, [page, debouncedBusca, incluirInativos])
 
   useEffect(() => {
-    coletarTodasPaginas((o, l) => redes.list({ incluir_inativos: true, offset: o, limit: l })).then(setRedesList)
-    coletarTodasPaginas((o, l) => tiposNegocio.list({ incluir_inativos: true, offset: o, limit: l })).then(setTiposList)
+    coletarTodasPaginas<Redes.Rede>((o, l) => redes.list({ incluir_inativos: true, offset: o, limit: l })).then(
+      setRedesList,
+    )
+    coletarTodasPaginas<TiposNegocio.Tipo>((o, l) =>
+      tiposNegocio.list({ incluir_inativos: true, offset: o, limit: l }),
+    ).then(setTiposList)
   }, [])
 
   function openCreate() {
@@ -128,6 +137,17 @@ export function Empresas() {
     setError('')
     setModalOpen(true)
   }
+
+  useEffect(() => {
+    const editId = (location.state as { empresaEditId?: number } | null)?.empresaEditId
+    if (editId == null) return
+    navigate('/empresas', { replace: true, state: {} })
+    apiEmpresas
+      .get(editId)
+      .then((emp) => openEdit(emp))
+      .catch(() => toast.showWarning('Empresa não encontrada.'))
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- abre edição ao retornar da tela de detalhe com state
+  }, [location.state])
 
   function handleCnpjCpfChange(value: string) {
     setCnpjCpf(maskCnpjCpf(value))
@@ -191,11 +211,15 @@ export function Empresas() {
       }
       if (editingId) {
         await apiEmpresas.update(editingId, payload)
+        setModalOpen(false)
+        load()
+        navigate(`/empresas/${editingId}`, { replace: true })
       } else {
-        await apiEmpresas.create(payload)
+        const criada = await apiEmpresas.create(payload)
+        setModalOpen(false)
+        load()
+        navigate(`/empresas/${criada.id}`, { replace: true })
       }
-      setModalOpen(false)
-      load()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro')
     } finally {
@@ -239,15 +263,15 @@ export function Empresas() {
                   createdAt: r.created_at,
                 }))}
               />
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Tipo de negócio</label>
-                <select value={tipoNegocioId} onChange={(e) => setTipoNegocioId(e.target.value === '' ? '' : Number(e.target.value))} className="w-full rounded-lg border border-slate-300 px-3 py-2">
-                  <option value="">Selecione</option>
-                  {tiposList.map((t) => (
-                    <option key={t.id} value={t.id}>{t.nome}</option>
-                  ))}
-                </select>
-              </div>
+              <Select
+                label="Tipo de negócio"
+                value={tipoNegocioId}
+                onChange={(v) => setTipoNegocioId(v === '' ? '' : Number(v))}
+                options={tiposList.map((t) => ({ value: t.id, label: t.nome }))}
+                includeEmpty
+                emptyLabel="Selecione"
+                placeholder="Selecione"
+              />
             </div>
 
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -300,10 +324,7 @@ export function Empresas() {
               <Input label="Telefone" value={telefone} onChange={(e) => setTelefone(e.target.value)} />
             </div>
 
-            <label className="flex items-center gap-2 text-sm text-slate-700">
-              <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} className="rounded border-slate-300" />
-              Ativo
-            </label>
+            <Switch checked={ativo} onCheckedChange={setAtivo} label="Ativo" description="Inativas ficam ocultas nos filtros padrão." />
 
             <div className="flex gap-2 pt-2 border-t border-slate-200">
               <Button type="submit" loading={saving}>Salvar</Button>
@@ -331,31 +352,69 @@ export function Empresas() {
         ) : list.length === 0 ? (
           <p className="text-slate-500">Nenhuma empresa encontrada.</p>
         ) : (
-          <ul className="divide-y divide-slate-200">
-            {list.map((e) => (
-              <li
-                key={e.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => openEdit(e)}
-                onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openEdit(e); } }}
-                className="flex cursor-pointer items-center justify-between rounded-lg py-3 px-2 -mx-2 transition-colors duration-150 hover:bg-slate-50/80 focus:outline-none focus:bg-slate-50/80"
-              >
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className={`truncate font-medium ${e.ativo ? 'text-slate-800' : 'text-slate-400'}`}>{e.nome}</span>
-                  {!e.ativo && <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600">Inativo</span>}
-                </div>
-                <div className="flex gap-1.5 shrink-0" onClick={(ev) => ev.stopPropagation()}>
-                  <Button variant="ghost" onClick={() => openEdit(e)} aria-label="Editar empresa">
-                    <IconPencil ariaHidden={false} />
-                  </Button>
-                  <Button variant="ghost" onClick={() => handleDelete(e.id)} aria-label="Excluir empresa">
-                    <IconTrash ariaHidden={false} />
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <div className="-mx-2 overflow-x-auto rounded-lg">
+            <table className="w-full min-w-[600px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="whitespace-nowrap py-2.5 pl-2 pr-4">Empresa</th>
+                  <th className="whitespace-nowrap py-2.5 pr-4">CNPJ / CPF</th>
+                  <th className="min-w-[8rem] py-2.5 pr-4">Rede</th>
+                  <th className="w-px py-2.5 pr-2 text-right" aria-hidden />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {list.map((e) => {
+                  const redeNome = redesList.find((r) => r.id === e.rede_id)?.nome ?? '—'
+                  const doc = e.cnpj_cpf ? maskCnpjCpf(e.cnpj_cpf) : '—'
+                  return (
+                    <tr
+                      key={e.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => navigate(`/empresas/${e.id}`)}
+                      onKeyDown={(ev) => {
+                        if (ev.key === 'Enter' || ev.key === ' ') {
+                          ev.preventDefault()
+                          navigate(`/empresas/${e.id}`)
+                        }
+                      }}
+                      className="cursor-pointer transition-colors hover:bg-slate-50/90 focus-within:bg-slate-50/90"
+                    >
+                      <td className="max-w-0 py-3 pl-2 pr-4">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span className={`truncate font-medium ${e.ativo ? 'text-slate-800' : 'text-slate-400'}`}>{e.nome}</span>
+                          {!e.ativo && (
+                            <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600">Inativo</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap py-3 pr-4 font-mono text-xs text-slate-600 tabular-nums">{doc}</td>
+                      <td className="max-w-[14rem] truncate py-3 pr-4 text-slate-600" title={redeNome}>
+                        {redeNome}
+                      </td>
+                      <td className="py-3 pr-2 text-right" onClick={(ev) => ev.stopPropagation()}>
+                        <div className="inline-flex gap-0.5">
+                          <Button
+                            variant="ghost"
+                            onClick={(ev) => {
+                              ev.stopPropagation()
+                              openEdit(e)
+                            }}
+                            aria-label="Editar empresa"
+                          >
+                            <IconPencil ariaHidden={false} />
+                          </Button>
+                          <Button variant="ghost" onClick={() => handleDelete(e.id)} aria-label="Excluir empresa">
+                            <IconTrash ariaHidden={false} />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
         </Card>
       )}

@@ -27,6 +27,28 @@ class Ticket(Base):
     atendente = relationship("Atendente", back_populates="tickets_atendidos")
     aberto_por = relationship("FuncionarioRede", back_populates="tickets_abertos")
     historicos = relationship("TicketHistorico", back_populates="ticket", order_by="TicketHistorico.created_at")
+    mensagens = relationship(
+        "TicketMensagem",
+        back_populates="ticket",
+        order_by="TicketMensagem.created_at",
+    )
+
+
+class TicketMensagem(Base):
+    """Linha do tempo do ticket: abertura, mensagens da equipe (público ao suporte) e comentários internos."""
+
+    __tablename__ = "ticket_mensagens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ticket_id = Column(Integer, ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False, index=True)
+    atendente_id = Column(Integer, ForeignKey("atendentes.id", ondelete="SET NULL"), nullable=True)
+    # abertura = texto inicial; publico = atualização visível à equipe; interno = só atendentes
+    tipo = Column(String(20), nullable=False)
+    corpo = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    ticket = relationship("Ticket", back_populates="mensagens")
+    atendente = relationship("Atendente", back_populates="ticket_mensagens")
 
 
 class TicketHistorico(Base):

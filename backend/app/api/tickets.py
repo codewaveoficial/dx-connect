@@ -1,12 +1,21 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 
 from app.database import get_db
-from app.models import Ticket, TicketHistorico, Empresa, Setor, StatusTicket, Atendente
-from app.schemas.ticket import TicketCreate, TicketUpdate, TicketRead, TicketHistoricoRead
+from app.models import Ticket, TicketHistorico, TicketMensagem, Empresa, Setor, StatusTicket, Atendente
+from app.schemas.ticket import (
+    TicketCreate,
+    TicketUpdate,
+    TicketRead,
+    TicketHistoricoRead,
+    TicketMensagemCreate,
+    TicketMensagemRead,
+)
 from app.schemas.lista_paginada import ListaPaginada
-from app.core.auth import obter_atendente_atual, exigir_admin
+from app.core.auth import obter_atendente_atual
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
@@ -121,6 +130,16 @@ def criar(
     db.add(ticket)
     db.commit()
     db.refresh(ticket)
+    corpo_abertura = (data.descricao or "").strip() or "—"
+    db.add(
+        TicketMensagem(
+            ticket_id=ticket.id,
+            atendente_id=atendente.id,
+            tipo="abertura",
+            corpo=corpo_abertura,
+        )
+    )
+    db.commit()
     return _ticket_para_read(ticket)
 
 
@@ -158,18 +177,93 @@ def historico(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket não encontrado")
     if not _pode_ver_ticket(atendente, ticket):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sem permissão para este ticket")
+    rows = (
+        db.query(TicketHistorico)
+        .options(joinedload(TicketHistorico.atendente))
+        .filter(TicketHistorico.ticket_id == ticket_id)
+        .order_by(TicketHistorico.created_at.desc())
+        .all()
+    )
     return [
         TicketHistoricoRead(
             id=h.id,
             ticket_id=h.ticket_id,
             atendente_id=h.atendente_id,
+            atendente_nome=h.atendente.nome if h.atendente else None,
             campo=h.campo,
             valor_antigo=h.valor_antigo,
             valor_novo=h.valor_novo,
             created_at=h.created_at,
         )
-        for h in ticket.historicos
+        for h in rows
     ]
+
+
+def _mensagem_para_read(m: TicketMensagem) -> TicketMensagemRead:
+    return TicketMensagemRead(
+        id=m.id,
+        ticket_id=m.ticket_id,
+        atendente_id=m.atendente_id,
+        atendente_nome=m.atendente.nome if m.atendente else None,
+        tipo=m.tipo,
+        corpo=m.corpo,
+        created_at=m.created_at,
+    )
+
+
+@router.get("/{ticket_id}/mensagens", response_model=list[TicketMensagemRead])
+def listar_mensagens(
+    ticket_id: int,
+    db: Session = Depends(get_db),
+    atendente: Atendente = Depends(obter_atendente_atual),
+):
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket não encontrado")
+    if not _pode_ver_ticket(atendente, ticket):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sem permissão para este ticket")
+    rows = (
+        db.query(TicketMensagem)
+        .options(joinedload(TicketMensagem.atendente))
+        .filter(TicketMensagem.ticket_id == ticket_id)
+        .order_by(TicketMensagem.created_at.asc())
+        .all()
+    )
+    return [_mensagem_para_read(m) for m in rows]
+
+
+@router.post("/{ticket_id}/mensagens", response_model=TicketMensagemRead, status_code=201)
+def criar_mensagem(
+    ticket_id: int,
+    data: TicketMensagemCreate,
+    db: Session = Depends(get_db),
+    atendente: Atendente = Depends(obter_atendente_atual),
+):
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket não encontrado")
+    if not _pode_ver_ticket(atendente, ticket):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sem permissão para este ticket")
+    corpo = data.corpo.strip()
+    if not corpo:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mensagem vazia")
+    m = TicketMensagem(
+        ticket_id=ticket_id,
+        atendente_id=atendente.id,
+        tipo=data.tipo,
+        corpo=corpo,
+    )
+    db.add(m)
+    db.commit()
+    db.refresh(m)
+    m = (
+        db.query(TicketMensagem)
+        .options(joinedload(TicketMensagem.atendente))
+        .filter(TicketMensagem.id == m.id)
+        .first()
+    )
+    assert m is not None
+    return _mensagem_para_read(m)
 
 
 def _registrar_historico(db: Session, ticket_id: int, atendente_id: int | None, campo: str, valor_antigo: str | None, valor_novo: str | None):
@@ -195,20 +289,44 @@ def atualizar(
     if not _pode_ver_ticket(atendente, ticket):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sem permissão para este ticket")
     update = data.model_dump(exclude_unset=True)
+
+    if "setor_id" in update:
+        if atendente.role != "admin":
+            permitidos = {s.id for s in atendente.setores}
+            if update["setor_id"] not in permitidos:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Sem permissão para mover o ticket para este setor",
+                )
+        novo_setor = db.query(Setor).filter(Setor.id == update["setor_id"]).first()
+        if not novo_setor:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Setor não encontrado")
+
     if "status_id" in update:
         antigo = str(ticket.status_id)
         novo = str(update["status_id"])
         _registrar_historico(db, ticket.id, atendente.id, "status_id", antigo, novo)
     if "atendente_id" in update:
         antigo = str(ticket.atendente_id) if ticket.atendente_id else ""
-        novo = str(update["atendente_id"]) if update["atendente_id"] else ""
+        novo_s = update["atendente_id"]
+        novo = str(novo_s) if novo_s is not None else ""
         _registrar_historico(db, ticket.id, atendente.id, "atendente_id", antigo, novo)
     if "setor_id" in update:
         antigo = str(ticket.setor_id)
         novo = str(update["setor_id"])
         _registrar_historico(db, ticket.id, atendente.id, "setor_id", antigo, novo)
+
     for k, v in update.items():
         setattr(ticket, k, v)
+
+    if "status_id" in update:
+        st = db.query(StatusTicket).filter(StatusTicket.id == ticket.status_id).first()
+        slug = (st.slug or "").lower() if st else ""
+        if slug == "fechado":
+            ticket.fechado_em = datetime.now(timezone.utc)
+        else:
+            ticket.fechado_em = None
+
     db.commit()
     db.refresh(ticket)
     return _ticket_para_read(ticket)

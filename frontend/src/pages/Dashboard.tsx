@@ -98,13 +98,17 @@ export function Dashboard() {
                     <td className="py-3 pr-4">{t.assunto}</td>
                     <td className="py-3 pr-4">{t.status_nome ?? t.status_id}</td>
                     <td className="py-3">
-                      <Link to={`/tickets/${t.id}`} aria-label="Ver ticket">
+                      <Link
+                        to={`/tickets/${t.id}`}
+                        aria-label="Ver ticket"
+                        className="inline-flex shrink-0"
+                      >
                         <Button
                           type="button"
                           variant="ghost"
-                          className="inline-flex size-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-900"
+                          className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white p-0 text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-900"
                         >
-                          <IconEye ariaHidden={false} />
+                          <IconEye className="size-5 shrink-0" ariaHidden={false} />
                         </Button>
                       </Link>
                     </td>

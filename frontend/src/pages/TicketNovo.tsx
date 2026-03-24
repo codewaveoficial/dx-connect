@@ -1,35 +1,74 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { tickets, empresas, setores } from '../api/client'
+import { tickets, empresas, setores, type Empresas, type Setores } from '../api/client'
 import { coletarTodasPaginas } from '../api/collectPages'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
+import { SelectComPesquisa } from '../components/ui/SelectComPesquisa'
+import { Select } from '../components/ui/Select'
+import { useToast } from '../components/ui/Toast'
+import { useAuth } from '../contexts/AuthContext'
 
 export function TicketNovo() {
-  const [empresasList, setEmpresasList] = useState<{ id: number; nome: string }[]>([])
-  const [setoresList, setSetoresList] = useState<{ id: number; nome: string }[]>([])
+  const { isAdmin, user } = useAuth()
+  const toast = useToast()
+  const navigate = useNavigate()
+
+  const [empresasList, setEmpresasList] = useState<Empresas.Empresa[]>([])
+  const [setoresList, setSetoresList] = useState<Setores.Setor[]>([])
   const [empresaId, setEmpresaId] = useState<number | ''>('')
   const [setorId, setSetorId] = useState<number | ''>('')
   const [assunto, setAssunto] = useState('')
   const [descricao, setDescricao] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const navigate = useNavigate()
+
+  const setorIdsPermitidos = useMemo(() => {
+    if (isAdmin) return null
+    return new Set(user?.setor_ids ?? [])
+  }, [isAdmin, user?.setor_ids])
+
+  const setoresFiltrados = useMemo(() => {
+    const ativos = setoresList.filter((s) => s.ativo)
+    if (!setorIdsPermitidos) return ativos.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    return ativos
+      .filter((s) => setorIdsPermitidos.has(s.id))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  }, [setoresList, setorIdsPermitidos])
+
+  const empresaItems = useMemo(
+    () =>
+      empresasList.map((e) => ({
+        id: e.id,
+        label: e.nome,
+        createdAt: e.created_at,
+      })),
+    [empresasList],
+  )
 
   useEffect(() => {
-    coletarTodasPaginas((o, l) => empresas.list({ offset: o, limit: l })).then((e) =>
-      setEmpresasList(e.map((x) => ({ id: x.id, nome: x.nome }))),
-    )
-    coletarTodasPaginas((o, l) => setores.list({ offset: o, limit: l })).then((s) =>
-      setSetoresList(s.map((x) => ({ id: x.id, nome: x.nome }))),
-    )
+    coletarTodasPaginas<Empresas.Empresa>((o, l) => empresas.list({ offset: o, limit: l })).then(setEmpresasList)
+    coletarTodasPaginas<Setores.Setor>((o, l) =>
+      setores.list({ incluir_inativos: true, offset: o, limit: l }),
+    ).then(setSetoresList)
   }, [])
+
+  useEffect(() => {
+    if (setorId === '') return
+    if (!setoresFiltrados.some((s) => s.id === setorId)) {
+      setSetorId('')
+    }
+  }, [setoresFiltrados, setorId])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!empresaId || !setorId || !assunto.trim()) {
-      setError('Preencha empresa, setor e assunto.')
+    if (!empresaId || !setorId || !assunto.trim() || !descricao.trim()) {
+      setError('Preencha empresa, setor, assunto e o relato do problema.')
+      return
+    }
+    if (!isAdmin && !setorIdsPermitidos?.has(Number(setorId))) {
+      setError('Selecione um setor ao qual você tenha acesso.')
       return
     }
     setError('')
@@ -39,80 +78,108 @@ export function TicketNovo() {
         empresa_id: Number(empresaId),
         setor_id: Number(setorId),
         assunto: assunto.trim(),
-        descricao: descricao.trim() || undefined,
+        descricao: descricao.trim(),
       })
+      toast.showSuccess('Ticket criado.')
       navigate(`/tickets/${created.id}`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao criar ticket')
+      const msg = err instanceof Error ? err.message : 'Erro ao criar ticket'
+      setError(msg)
+      toast.showWarning(msg)
     } finally {
       setLoading(false)
     }
   }
 
+  const semSetorPermitido = !isAdmin && setoresFiltrados.length === 0
+
   return (
     <div className="space-y-6">
+      <nav aria-label="breadcrumb" className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+        <button
+          type="button"
+          onClick={() => navigate('/tickets')}
+          className="font-medium text-slate-600 hover:text-slate-900"
+        >
+          Tickets
+        </button>
+        <span aria-hidden className="text-slate-300">
+          /
+        </span>
+        <span className="font-semibold text-slate-800">Novo</span>
+      </nav>
+
       <h1 className="text-2xl font-bold text-slate-800">Novo ticket</h1>
+
+      {semSetorPermitido && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Você não está vinculado a nenhum setor ativo. Peça a um administrador para associar setores ao seu usuário
+          antes de abrir tickets.
+        </div>
+      )}
+
       <Card title="Abrir ticket">
+        <p className="mb-4 text-sm text-slate-600">
+          O <strong>responsável</strong> (atendente) é opcional na abertura: você pode deixar em branco e atribuir depois na tela do ticket.
+        </p>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
-          )}
+          {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+
+          <SelectComPesquisa
+            id="ticket-empresa"
+            label="Empresa *"
+            value={empresaId}
+            onChange={(id) => setEmpresaId(id)}
+            items={empresaItems}
+            placeholder="Buscar empresa..."
+            required
+            disabled={semSetorPermitido}
+            recentCount={10}
+          />
+
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Empresa</label>
-            <select
-              value={empresaId}
-              onChange={(e) => setEmpresaId(e.target.value === '' ? '' : Number(e.target.value))}
-              required
-              className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            >
-              <option value="">Selecione</option>
-              {empresasList.map((emp) => (
-                <option key={emp.id} value={emp.id}>
-                  {emp.nome}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Setor</label>
-            <select
+            <Select
+              id="ticket-setor"
+              label="Setor *"
               value={setorId}
-              onChange={(e) => setSetorId(e.target.value === '' ? '' : Number(e.target.value))}
-              required
-              className="w-full rounded-lg border border-slate-300 px-3 py-2"
-            >
-              <option value="">Selecione</option>
-              {setoresList.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nome}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setSetorId(v === '' ? '' : Number(v))}
+              options={setoresFiltrados.map((s) => ({ value: s.id, label: s.nome }))}
+              includeEmpty
+              emptyLabel="Selecione"
+              placeholder="Selecione"
+              disabled={semSetorPermitido}
+            />
+            {!isAdmin && setoresFiltrados.length > 0 && (
+              <p className="mt-1 text-xs text-slate-500">Somente setores aos quais você está vinculado.</p>
+            )}
           </div>
+
           <Input
-            label="Assunto"
+            label="Assunto (resumo) *"
             value={assunto}
             onChange={(e) => setAssunto(e.target.value)}
             required
+            disabled={semSetorPermitido}
           />
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Descrição</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Relato do problema *</label>
+            <p className="mb-2 text-xs text-slate-500">
+              Este texto entra como primeira mensagem do ticket (solicitação inicial).
+            </p>
             <textarea
               value={descricao}
               onChange={(e) => setDescricao(e.target.value)}
-              rows={4}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2"
+              rows={5}
+              required
+              disabled={semSetorPermitido}
+              className="w-full rounded-xl border-0 bg-white px-3 py-2 text-sm shadow-sm ring-1 ring-slate-200/90 focus:outline-none focus:ring-2 focus:ring-slate-400/35"
             />
           </div>
-          <div className="flex gap-2">
-            <Button type="submit" loading={loading}>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" loading={loading} disabled={semSetorPermitido}>
               Criar ticket
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => navigate('/')}
-            >
+            <Button type="button" variant="secondary" onClick={() => navigate('/tickets')}>
               Cancelar
             </Button>
           </div>

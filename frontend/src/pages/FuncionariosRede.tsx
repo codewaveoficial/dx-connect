@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { funcionariosRede, redes, empresas, FuncionariosRede as FuncionarioRedeTipo, type Redes, type Empresas } from '../api/client'
+import {
+  funcionariosRede,
+  redes,
+  empresas,
+  type FuncionariosRede as FuncionarioRedeTipo,
+  type Redes,
+  type Empresas,
+} from '../api/client'
 import { coletarTodasPaginas } from '../api/collectPages'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -10,7 +17,10 @@ import { IconTrash } from '../components/ui/IconTrash'
 import { useToast } from '../components/ui/Toast'
 import { FiltroInativos } from '../components/ui/FiltroInativos'
 import { SelectComPesquisa } from '../components/ui/SelectComPesquisa'
+import { Select } from '../components/ui/Select'
 import { BarraBuscaPaginacao, PAGE_SIZE_PADRAO } from '../components/ui/BarraBuscaPaginacao'
+import { Switch } from '../components/ui/Switch'
+import { CheckboxField } from '../components/ui/CheckboxField'
 
 type Tipo = 'socio' | 'supervisor' | 'colaborador'
 
@@ -48,13 +58,15 @@ export function FuncionariosRede() {
     setPage(1)
   }, [debouncedBusca, incluirInativos])
 
-  function load() {
+  function load(override?: { busca?: string; page?: number }) {
     setLoading(true)
+    const buscaEff = override?.busca !== undefined ? override.busca : debouncedBusca
+    const pageEff = override?.page !== undefined ? override.page : page
     funcionariosRede
       .list({
         incluir_inativos: incluirInativos,
-        busca: debouncedBusca || undefined,
-        offset: (page - 1) * PAGE_SIZE_PADRAO,
+        busca: buscaEff.trim() || undefined,
+        offset: (pageEff - 1) * PAGE_SIZE_PADRAO,
         limit: PAGE_SIZE_PADRAO,
       })
       .then(({ items, total: t }) => {
@@ -69,8 +81,12 @@ export function FuncionariosRede() {
   }, [page, debouncedBusca, incluirInativos])
 
   useEffect(() => {
-    coletarTodasPaginas((o, l) => redes.list({ incluir_inativos: true, offset: o, limit: l })).then(setRedesList)
-    coletarTodasPaginas((o, l) => empresas.list({ incluir_inativos: true, offset: o, limit: l })).then(setEmpresasList)
+    coletarTodasPaginas<Redes.Rede>((o, l) => redes.list({ incluir_inativos: true, offset: o, limit: l })).then(
+      setRedesList,
+    )
+    coletarTodasPaginas<Empresas.Empresa>((o, l) =>
+      empresas.list({ incluir_inativos: true, offset: o, limit: l }),
+    ).then(setEmpresasList)
   }, [])
 
   const openEdit = useCallback(
@@ -173,11 +189,18 @@ export function FuncionariosRede() {
       }
       if (editingId) {
         await funcionariosRede.update(editingId, payload)
+        setModalOpen(false)
+        load()
+        navigate(`/funcionarios-rede/${editingId}`, { replace: true })
       } else {
-        await funcionariosRede.create(payload)
+        const criado = await funcionariosRede.create(payload)
+        setModalOpen(false)
+        setBusca('')
+        setDebouncedBusca('')
+        setPage(1)
+        load({ busca: '', page: 1 })
+        navigate(`/funcionarios-rede/${criado.id}`, { replace: true })
       }
-      setModalOpen(false)
-      load()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro')
     } finally {
@@ -217,24 +240,22 @@ export function FuncionariosRede() {
               {error && <div className="rounded bg-red-50 p-2 text-sm text-red-700">{error}</div>}
               <Input label="Nome" value={nome} onChange={(e) => setNome(e.target.value)} required />
               <Input label="E-mail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Tipo</label>
-                <select
-                  value={tipo}
-                  onChange={(e) => {
-                    const t = e.target.value as Tipo
-                    setTipo(t)
-                    setEmpresaId('')
-                    setEmpresaIds([])
-                    if (t === 'socio' && !redeId) setRedeId(redePadraoRecente())
-                  }}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2"
-                >
-                  <option value="socio">Sócio</option>
-                  <option value="supervisor">Supervisor</option>
-                  <option value="colaborador">Colaborador</option>
-                </select>
-              </div>
+              <Select
+                label="Tipo"
+                value={tipo}
+                onChange={(v) => {
+                  const t = v as Tipo
+                  setTipo(t)
+                  setEmpresaId('')
+                  setEmpresaIds([])
+                  if (t === 'socio' && !redeId) setRedeId(redePadraoRecente())
+                }}
+                options={[
+                  { value: 'socio', label: 'Sócio' },
+                  { value: 'supervisor', label: 'Supervisor' },
+                  { value: 'colaborador', label: 'Colaborador' },
+                ]}
+              />
               <SelectComPesquisa
                 id="funcionario-rede"
                 label="Rede"
@@ -276,21 +297,21 @@ export function FuncionariosRede() {
                   ) : empresasDaRede.length === 0 ? (
                     <p className="text-sm text-slate-500">Nenhuma empresa ativa nesta rede.</p>
                   ) : (
-                    <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 p-3">
+                    <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50/40 p-3">
                       {empresasDaRede.map((e) => (
-                        <label key={e.id} className="flex items-center gap-2">
-                          <input type="checkbox" checked={empresaIds.includes(e.id)} onChange={() => toggleEmpresa(e.id)} />
-                          <span>{e.nome}</span>
-                        </label>
+                        <CheckboxField
+                          key={e.id}
+                          checked={empresaIds.includes(e.id)}
+                          onChange={() => toggleEmpresa(e.id)}
+                        >
+                          {e.nome}
+                        </CheckboxField>
                       ))}
                     </div>
                   )}
                 </div>
               )}
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} className="rounded border-slate-300" />
-                Ativo
-              </label>
+              <Switch checked={ativo} onCheckedChange={setAtivo} label="Ativo" />
               <div className="flex gap-2 border-t border-slate-200 pt-2">
                 <Button type="submit" loading={saving}>
                   Salvar
@@ -327,11 +348,11 @@ export function FuncionariosRede() {
                   key={f.id}
                   role="button"
                   tabIndex={0}
-                  onClick={() => openEdit(f)}
+                  onClick={() => navigate(`/funcionarios-rede/${f.id}`)}
                   onKeyDown={(ev) => {
                     if (ev.key === 'Enter' || ev.key === ' ') {
                       ev.preventDefault()
-                      openEdit(f)
+                      navigate(`/funcionarios-rede/${f.id}`)
                     }
                   }}
                   className="flex cursor-pointer items-center justify-between rounded-lg py-3 px-2 -mx-2 transition-colors duration-150 hover:bg-slate-50/80 focus:outline-none focus:bg-slate-50/80"
@@ -345,7 +366,14 @@ export function FuncionariosRede() {
                     <span className="text-xs text-slate-400">({tipoLabel[f.tipo as Tipo]})</span>
                   </div>
                   <div className="flex shrink-0 gap-1.5" onClick={(ev) => ev.stopPropagation()}>
-                    <Button variant="ghost" onClick={() => openEdit(f)} aria-label="Editar funcionário">
+                    <Button
+                      variant="ghost"
+                      onClick={(ev) => {
+                        ev.stopPropagation()
+                        openEdit(f)
+                      }}
+                      aria-label="Editar funcionário"
+                    >
                       <IconPencil ariaHidden={false} />
                     </Button>
                     <Button variant="ghost" onClick={() => handleDelete(f.id)} aria-label="Excluir funcionário">

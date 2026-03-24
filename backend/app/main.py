@@ -18,8 +18,30 @@ async def lifespan(app: FastAPI):
     try:
         from app.seed import run_seed
         run_seed()
-    except Exception:
-        pass  # DB pode ainda não estar acessível no primeiro start
+    except Exception as e:
+        logger.warning("Seed inicial não concluído (tente reiniciar o backend ou rodar python -m app.seed): %s", e)
+    # Tickets antigos: primeira linha do tempo a partir de descrição legada
+    try:
+        from app.models.ticket import Ticket, TicketMensagem
+        from app.database import SessionLocal
+
+        s = SessionLocal()
+        try:
+            for t in s.query(Ticket).all():
+                n = s.query(TicketMensagem).filter(TicketMensagem.ticket_id == t.id).count()
+                if n == 0:
+                    body = (t.descricao or "").strip() or (
+                        "(Abertura sem texto adicional — registro anterior ao histórico de mensagens.)"
+                    )
+                    s.add(TicketMensagem(ticket_id=t.id, atendente_id=None, tipo="abertura", corpo=body))
+            s.commit()
+        except Exception as ex:
+            logger.warning("Backfill ticket_mensagens: %s", ex)
+            s.rollback()
+        finally:
+            s.close()
+    except Exception as ex:
+        logger.warning("Backfill ticket_mensagens (import): %s", ex)
     # Garante que colunas adicionadas ao modelo Empresa existem na tabela (DB criado com schema antigo)
     try:
         from sqlalchemy import text

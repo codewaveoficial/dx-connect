@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 
 type ToastType = 'success' | 'error' | 'warning' | 'info'
 
@@ -8,11 +8,27 @@ interface ToastItem {
   message: string
 }
 
+function textoParaToast(input: unknown): string {
+  if (typeof input === 'string') {
+    const t = input.trim()
+    if (t && t !== '[object Object]') return t
+  }
+  if (input instanceof Error && input.message && input.message !== '[object Object]') {
+    return input.message
+  }
+  if (input !== null && typeof input === 'object') {
+    const o = input as Record<string, unknown>
+    if (typeof o.detail === 'string' && o.detail.trim()) return o.detail.trim()
+    if (typeof o.message === 'string' && o.message.trim()) return o.message.trim()
+  }
+  return 'Não foi possível concluir a ação. Tente novamente.'
+}
+
 interface ToastContextValue {
-  showSuccess: (message: string) => void
-  showError: (message: string) => void
-  showWarning: (message: string) => void
-  showInfo: (message: string) => void
+  showSuccess: (message: unknown) => void
+  showError: (message: unknown) => void
+  showWarning: (message: unknown) => void
+  showInfo: (message: unknown) => void
 }
 
 const ToastContext = createContext<ToastContextValue | undefined>(undefined)
@@ -24,9 +40,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts((current) => current.filter((t) => t.id !== id))
   }, [])
 
-  const show = useCallback((type: ToastType, message: string) => {
+  const show = useCallback((type: ToastType, message: unknown) => {
     const id = Date.now() + Math.random()
-    setToasts((current) => [...current, { id, type, message }])
+    const text = textoParaToast(message)
+    setToasts((current) => [...current, { id, type, message: text }])
     // Remover automaticamente após 4s
     setTimeout(() => remove(id), 4000)
   }, [remove])

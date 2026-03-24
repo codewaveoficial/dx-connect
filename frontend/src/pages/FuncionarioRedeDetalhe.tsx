@@ -1,0 +1,259 @@
+import { useEffect, useState, type ReactNode } from 'react'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { funcionariosRede, redes, empresas, type FuncionariosRede } from '../api/client'
+import { Button } from '../components/ui/Button'
+import { useToast } from '../components/ui/Toast'
+
+const tipoLabel: Record<string, string> = {
+  socio: 'Sócio',
+  supervisor: 'Supervisor',
+  colaborador: 'Colaborador',
+}
+
+function DetailRow({ label, value }: { label: string; value: string | null | undefined }) {
+  const v = value?.trim()
+  return (
+    <div className="grid grid-cols-1 gap-0.5 border-b border-slate-100 py-3 last:border-0 sm:grid-cols-[minmax(0,10rem)_1fr] sm:gap-6 sm:py-3.5">
+      <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{label}</dt>
+      <dd className="text-sm leading-relaxed text-slate-800">{v ? v : '—'}</dd>
+    </div>
+  )
+}
+
+type VoltarState = { voltarRedeId?: number }
+
+export function FuncionarioRedeDetalhe() {
+  const { id } = useParams<{ id: string }>()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const toast = useToast()
+  const funcionarioId = id ? parseInt(id, 10) : NaN
+  const voltarRedeId = (location.state as VoltarState | null)?.voltarRedeId
+
+  const [f, setF] = useState<FuncionariosRede.Funcionario | null>(null)
+  const [redeNome, setRedeNome] = useState('')
+  const [vinculoExtra, setVinculoExtra] = useState<ReactNode>(null)
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+
+  useEffect(() => {
+    if (!id || isNaN(funcionarioId)) {
+      setLoading(false)
+      setLoadError(true)
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    setLoadError(false)
+    setVinculoExtra(null)
+
+    funcionariosRede
+      .get(funcionarioId)
+      .then(async (func) => {
+        if (cancelled) return
+        setF(func)
+
+        const rid = func.rede_id
+        if (rid != null) {
+          try {
+            const r = await redes.get(rid)
+            if (!cancelled) setRedeNome(r.nome)
+          } catch {
+            if (!cancelled) setRedeNome('—')
+          }
+        } else if (!cancelled) setRedeNome('')
+
+        if (cancelled) return
+
+        if (func.tipo === 'socio') {
+          setVinculoExtra(
+            <p className="text-sm text-slate-700">
+              Pessoa vinculada como <strong>sócio</strong> da rede (visão e cadastros no contexto da rede).
+            </p>,
+          )
+        } else if (func.tipo === 'colaborador' && func.empresa_id) {
+          try {
+            const em = await empresas.get(func.empresa_id)
+            if (!cancelled) {
+              setVinculoExtra(
+                <p className="text-sm text-slate-700">
+                  Colaborador da empresa{' '}
+                  <Link
+                    to={`/empresas/${em.id}`}
+                    className="font-medium text-slate-800 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-500"
+                  >
+                    {em.nome}
+                  </Link>
+                  .
+                </p>,
+              )
+            }
+          } catch {
+            if (!cancelled) {
+              setVinculoExtra(<p className="text-sm text-slate-600">Empresa vinculada (ID {func.empresa_id}) não encontrada.</p>)
+            }
+          }
+        } else if (func.tipo === 'supervisor' && func.empresa_ids?.length) {
+          try {
+            const lista = await Promise.all(
+              func.empresa_ids.map((eid) =>
+                empresas.get(eid).catch(() => null),
+              ),
+            )
+            if (cancelled) return
+            const ok = lista.filter(Boolean) as Awaited<ReturnType<typeof empresas.get>>[]
+            if (ok.length === 0) {
+              setVinculoExtra(<p className="text-sm text-slate-600">Não foi possível carregar os nomes das empresas.</p>)
+            } else {
+              setVinculoExtra(
+                <ul className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-slate-700">
+                  {ok.map((em) => (
+                    <li key={em.id}>
+                      <Link
+                        to={`/empresas/${em.id}`}
+                        className="font-medium text-slate-800 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-500"
+                      >
+                        {em.nome}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>,
+              )
+            }
+          } catch {
+            if (!cancelled) setVinculoExtra(null)
+          }
+        } else {
+          setVinculoExtra(null)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLoadError(true)
+          setF(null)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [id, funcionarioId])
+
+  useEffect(() => {
+    if (!loadError || loading) return
+    toast.showWarning('Funcionário não encontrado.')
+    navigate(voltarRedeId != null ? `/redes/${voltarRedeId}` : '/funcionarios-rede', { replace: true })
+  }, [loadError, loading, navigate, toast, voltarRedeId])
+
+  function abrirEdicao() {
+    if (!f) return
+    navigate('/funcionarios-rede', { state: { editId: f.id } })
+  }
+
+  async function handleExcluir() {
+    if (!f || !confirm('Excluir este funcionário? Esta ação não pode ser desfeita.')) return
+    try {
+      await funcionariosRede.delete(f.id)
+      toast.showSuccess('Funcionário excluído.')
+      navigate(voltarRedeId != null ? `/redes/${voltarRedeId}` : '/funcionarios-rede', { replace: true })
+    } catch (err) {
+      toast.showWarning(err instanceof Error ? err.message : 'Não foi possível excluir.')
+    }
+  }
+
+  const voltarHref = voltarRedeId != null ? `/redes/${voltarRedeId}` : '/funcionarios-rede'
+  const voltarLabel = voltarRedeId != null ? 'Voltar à rede' : 'Funcionários da rede'
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-6">
+        <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
+        <div className="h-9 w-2/3 max-w-md animate-pulse rounded-lg bg-slate-200" />
+        <div className="h-48 animate-pulse rounded-2xl bg-slate-100" />
+      </div>
+    )
+  }
+
+  if (!f) {
+    return null
+  }
+
+  const createdRaw = f.created_at
+  const createdFmt =
+    createdRaw != null && createdRaw !== ''
+      ? new Date(createdRaw).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+      : null
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-8 pb-10">
+      <div>
+        <Link
+          to={voltarHref}
+          className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 transition-colors hover:text-slate-800"
+        >
+          <span aria-hidden>←</span> {voltarLabel}
+        </Link>
+      </div>
+
+      <header className="space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 space-y-2">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 md:text-3xl">{f.nome}</h1>
+            <p className="break-all text-sm text-slate-600">{f.email}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                  f.ativo ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-600/15' : 'bg-slate-100 text-slate-600 ring-1 ring-slate-300/60'
+                }`}
+              >
+                {f.ativo ? 'Ativo' : 'Inativo'}
+              </span>
+              <span className="text-sm text-slate-500">{tipoLabel[f.tipo] ?? f.tipo}</span>
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => navigate(voltarHref)}>
+              Voltar
+            </Button>
+            <Button onClick={abrirEdicao}>Editar</Button>
+            <Button variant="danger" onClick={handleExcluir}>
+              Excluir
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <section className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm sm:p-7">
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Vínculos</h2>
+        <dl>
+          <div className="grid grid-cols-1 gap-0.5 border-b border-slate-100 py-3 sm:grid-cols-[minmax(0,10rem)_1fr] sm:gap-6 sm:py-3.5">
+            <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Rede</dt>
+            <dd className="text-sm">
+              {f.rede_id != null && redeNome && redeNome !== '—' ? (
+                <Link
+                  to={`/redes/${f.rede_id}`}
+                  className="font-medium text-slate-800 underline decoration-slate-300 underline-offset-2 transition-colors hover:text-slate-950 hover:decoration-slate-500"
+                >
+                  {redeNome}
+                </Link>
+              ) : (
+                <span className="text-slate-800">—</span>
+              )}
+            </dd>
+          </div>
+        </dl>
+        {vinculoExtra ? <div className="mt-4 border-t border-slate-100 pt-4">{vinculoExtra}</div> : null}
+      </section>
+
+      <section className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm sm:p-7">
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Registro</h2>
+        <dl>
+          <DetailRow label="Cadastrado em" value={createdFmt} />
+        </dl>
+      </section>
+    </div>
+  )
+}

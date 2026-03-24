@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+from typing import Literal
+
+from pydantic import BaseModel, Field
 from datetime import datetime
 
 
@@ -15,11 +17,11 @@ class TicketCreate(TicketBase):
 
 
 class TicketUpdate(BaseModel):
+    """Assunto e descrição não são editáveis aqui — use mensagens no ticket."""
+
     setor_id: int | None = None
     status_id: int | None = None
     atendente_id: int | None = None
-    assunto: str | None = None
-    descricao: str | None = None
 
 
 class TicketRead(BaseModel):
@@ -45,10 +47,29 @@ class TicketRead(BaseModel):
         from_attributes = True
 
 
+class TicketMensagemCreate(BaseModel):
+    corpo: str = Field(..., min_length=1, max_length=20000)
+    tipo: Literal["publico", "interno"]
+
+
+class TicketMensagemRead(BaseModel):
+    id: int
+    ticket_id: int
+    atendente_id: int | None = None
+    atendente_nome: str | None = None
+    tipo: str
+    corpo: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class TicketHistoricoRead(BaseModel):
     id: int
     ticket_id: int
     atendente_id: int | None = None
+    atendente_nome: str | None = None
     campo: str
     valor_antigo: str | None = None
     valor_novo: str | None = None
