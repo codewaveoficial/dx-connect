@@ -19,6 +19,7 @@ export function Atendentes() {
   const [debouncedBusca, setDebouncedBusca] = useState('')
   const [setoresList, setSetoresList] = useState<Setores.Setor[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [incluirInativos, setIncluirInativos] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -42,6 +43,7 @@ export function Atendentes() {
 
   function load() {
     setLoading(true)
+    setLoadError('')
     atendentes
       .list({
         incluir_inativos: incluirInativos,
@@ -52,6 +54,11 @@ export function Atendentes() {
       .then(({ items, total: t }) => {
         setList(items)
         setTotal(t)
+      })
+      .catch((err) => {
+        setList([])
+        setTotal(0)
+        setLoadError(err instanceof Error ? err.message : 'Erro ao carregar atendentes')
       })
       .finally(() => setLoading(false))
   }
@@ -146,6 +153,11 @@ export function Atendentes() {
             disabled={loading}
             extra={<FiltroInativos incluirInativos={incluirInativos} onChange={setIncluirInativos} />}
           />
+        {loadError && (
+          <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800/60 dark:bg-red-950/40 dark:text-red-200">
+            {loadError}
+          </div>
+        )}
         {loading ? (
           <p className="text-slate-500 dark:text-slate-400">Carregando...</p>
         ) : list.length === 0 ? (

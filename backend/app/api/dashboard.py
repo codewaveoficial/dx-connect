@@ -2,23 +2,24 @@ from datetime import date
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, cast, Date
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import Ticket, StatusTicket
+from app.models import Ticket, StatusTicket, Empresa
 from app.models.atendente import Atendente
 from app.schemas.dashboard import DashboardResponse, DashboardResumo, StatusCount
 from app.schemas.ticket import TicketRead
 from app.core.auth import obter_atendente_atual
 from app.api.tickets import _ticket_para_read
+from app.core.setor_scope import ids_setores_visiveis_atendente
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
-def _filtro_setor_atendente(q, atendente: Atendente):
+def _filtro_setor_atendente(db: Session, q, atendente: Atendente):
     if atendente.role != "admin":
-        setor_ids = [s.id for s in atendente.setores]
-        return q.filter(Ticket.setor_id.in_(setor_ids))
+        vis = ids_setores_visiveis_atendente(db, atendente)
+        return q.filter(Ticket.setor_id.in_(vis))
     return q
 
 
@@ -31,7 +32,7 @@ def obter_dashboard(
 
     # Total de tickets
     q_total = db.query(func.count(Ticket.id)).select_from(Ticket)
-    q_total = _filtro_setor_atendente(q_total, atendente)
+    q_total = _filtro_setor_atendente(db, q_total, atendente)
     total_tickets = q_total.scalar() or 0
 
     # Tickets abertos hoje
@@ -40,7 +41,7 @@ def obter_dashboard(
         .select_from(Ticket)
         .filter(cast(Ticket.created_at, Date) == hoje)
     )
-    q_hoje = _filtro_setor_atendente(q_hoje, atendente)
+    q_hoje = _filtro_setor_atendente(db, q_hoje, atendente)
     abertos_hoje = q_hoje.scalar() or 0
 
     # Contagem por status
@@ -49,7 +50,7 @@ def obter_dashboard(
         .join(StatusTicket, Ticket.status_id == StatusTicket.id)
         .group_by(Ticket.status_id, StatusTicket.nome)
     )
-    q_status = _filtro_setor_atendente(q_status, atendente)
+    q_status = _filtro_setor_atendente(db, q_status, atendente)
     rows_status = q_status.all()
     por_status = [
         StatusCount(status_id=sid, status_nome=nome, total=tot)
@@ -70,8 +71,18 @@ def obter_dashboard(
         .join(Ticket.status)
         .outerjoin(Ticket.atendente)
     )
-    q_ultimos = _filtro_setor_atendente(q_ultimos, atendente)
-    ultimos = q_ultimos.order_by(Ticket.created_at.desc()).limit(10).all()
+    q_ultimos = _filtro_setor_atendente(db, q_ultimos, atendente)
+    ultimos = (
+        q_ultimos.options(
+            joinedload(Ticket.empresa).joinedload(Empresa.rede),
+            joinedload(Ticket.setor),
+            joinedload(Ticket.status),
+            joinedload(Ticket.atendente),
+        )
+        .order_by(Ticket.created_at.desc())
+        .limit(10)
+        .all()
+    )
     ultimos_tickets = [_ticket_para_read(t) for t in ultimos]
 
     return DashboardResponse(resumo=resumo, ultimos_tickets=ultimos_tickets)

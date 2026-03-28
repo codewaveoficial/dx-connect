@@ -39,6 +39,7 @@ class TicketRead(BaseModel):
     updated_at: datetime | None = None
     # opcional: nomes para exibição
     empresa_nome: str | None = None
+    rede_nome: str | None = None
     setor_nome: str | None = None
     status_nome: str | None = None
     atendente_nome: str | None = None

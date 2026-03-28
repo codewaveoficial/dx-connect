@@ -141,6 +141,9 @@ export const setores = {
 export const atendentes = {
   list: (params?: { incluir_inativos?: boolean; busca?: string; offset?: number; limit?: number }) =>
     listPaginated<Atendentes.Atendente>('/atendentes', params),
+  /** Ligação real ao setor no banco (para o modal de ticket); não exige ser admin. */
+  listPorSetor: (setorId: number, params?: { incluir_inativos?: boolean }) =>
+    api<Atendentes.Atendente[]>(withParams(`/atendentes/por-setor/${setorId}`, params)),
   me: () => api<Atendentes.Atendente>('/atendentes/me'),
   get: (id: number) => api<Atendentes.Atendente>(`/atendentes/${id}`),
   create: (data: Atendentes.Create) => api<Atendentes.Atendente>('/atendentes', { method: 'POST', body: JSON.stringify(data) }),
@@ -190,6 +193,9 @@ export const tickets = {
     status_id?: number;
     protocolo?: string;
     busca?: string;
+    sem_responsavel?: boolean;
+    meus?: boolean;
+    atendente_id?: number;
     offset?: number;
     limit?: number;
   }) => listPaginated<Tickets.Ticket>('/tickets', params),
@@ -457,6 +463,7 @@ export namespace Tickets {
     created_at?: string;
     updated_at?: string;
     empresa_nome?: string;
+    rede_nome?: string;
     setor_nome?: string;
     status_nome?: string;
     atendente_nome?: string;

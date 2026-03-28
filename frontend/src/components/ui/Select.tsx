@@ -7,7 +7,7 @@ export type SelectValue = string | number | ''
 export type SelectOption = { value: string | number; label: string }
 
 const chevron = (
-  <svg className="size-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+  <svg className="size-4 shrink-0 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
   </svg>
 )
@@ -32,7 +32,12 @@ export interface SelectProps {
 }
 
 function sameValue(a: SelectValue, b: string | number): boolean {
-  return a === b
+  if (a === b) return true
+  if (a === '' || b === '') return false
+  const na = Number(a)
+  const nb = Number(b)
+  if (!Number.isNaN(na) && !Number.isNaN(nb) && na === nb) return true
+  return false
 }
 
 export function Select({
@@ -118,8 +123,8 @@ export function Select({
 
   const labelClass =
     labelStyle === 'overline'
-      ? 'mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400'
-      : 'mb-1 block text-sm font-medium text-slate-700'
+      ? 'mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500'
+      : 'mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300'
 
   const menu =
     open &&
@@ -129,7 +134,7 @@ export function Select({
         ref={menuRef}
         id={listboxId}
         role="listbox"
-        className="fixed z-[600] overflow-y-auto rounded-xl border border-slate-200/95 bg-white py-1.5 shadow-xl shadow-slate-200/50 ring-1 ring-slate-900/[0.04]"
+        className="fixed z-[600] overflow-y-auto rounded-xl border border-slate-200/95 bg-white py-1.5 shadow-xl shadow-slate-200/50 ring-1 ring-slate-900/[0.04] dark:border-slate-600 dark:bg-slate-900 dark:shadow-black/40 dark:ring-white/10"
         style={{
           top: menuPos.top,
           left: menuPos.left,
@@ -142,8 +147,10 @@ export function Select({
             type="button"
             role="option"
             aria-selected={value === ''}
-            className={`mx-1 flex w-[calc(100%-0.5rem)] rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-slate-50 ${
-              value === '' ? 'bg-slate-100/90 font-medium text-slate-900' : 'text-slate-700'
+            className={`mx-1 flex w-[calc(100%-0.5rem)] rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/80 ${
+              value === ''
+                ? 'bg-slate-100/90 font-medium text-slate-900 dark:bg-slate-800 dark:text-slate-100'
+                : 'text-slate-700 dark:text-slate-300'
             }`}
             onClick={() => {
               onChange('')
@@ -161,8 +168,10 @@ export function Select({
               type="button"
               role="option"
               aria-selected={selected}
-              className={`mx-1 flex w-[calc(100%-0.5rem)] rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-slate-50 ${
-                selected ? 'bg-slate-100/90 font-medium text-slate-900' : 'text-slate-700'
+              className={`mx-1 flex w-[calc(100%-0.5rem)] rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/80 ${
+                selected
+                  ? 'bg-slate-100/90 font-medium text-slate-900 dark:bg-slate-800 dark:text-slate-100'
+                  : 'text-slate-700 dark:text-slate-300'
               }`}
               onClick={() => {
                 onChange(o.value)
@@ -194,8 +203,8 @@ export function Select({
         aria-controls={listboxId}
         aria-label={ariaLabel ?? label ?? placeholder}
         onClick={() => !disabled && setOpen((o) => !o)}
-        className={`flex w-full items-center justify-between gap-2 rounded-xl border-0 bg-white py-2 pl-3 pr-2.5 text-left text-sm shadow-sm ring-1 ring-slate-200/90 transition-[box-shadow,ring] hover:ring-slate-300/80 focus:outline-none focus:ring-2 focus:ring-slate-400/35 disabled:cursor-not-allowed disabled:opacity-50 ${
-          value === '' ? 'text-slate-500' : 'text-slate-900'
+        className={`flex w-full items-center justify-between gap-2 rounded-xl border-0 bg-white py-2 pl-3 pr-2.5 text-left text-sm shadow-sm ring-1 ring-slate-200/90 transition-[box-shadow,ring] hover:ring-slate-300/80 focus:outline-none focus:ring-2 focus:ring-slate-400/35 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900/80 dark:text-slate-100 dark:ring-slate-600/90 dark:hover:ring-slate-500 dark:focus:ring-slate-500/40 ${
+          value === '' ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-slate-100'
         }`}
       >
         <span className="min-w-0 flex-1 truncate">{displayText}</span>

@@ -120,7 +120,8 @@ export function TicketNovo() {
 
       <Card title="Abrir ticket">
         <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
-          O <strong>responsável</strong> (atendente) é opcional na abertura: você pode deixar em branco e atribuir depois na tela do ticket.
+          O ticket entra na <strong>fila do setor</strong> (sem responsável). Qualquer atendente do setor pode abrir o chamado e usar{' '}
+          <strong>Atribuir a mim</strong> para assumir o atendimento.
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
@@ -173,6 +174,7 @@ export function TicketNovo() {
             <textarea
               value={descricao}
               onChange={(e) => setDescricao(e.target.value)}
+              spellCheck={false}
               rows={5}
               required
               disabled={semSetorPermitido}

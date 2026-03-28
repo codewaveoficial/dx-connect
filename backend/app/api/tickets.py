@@ -16,6 +16,7 @@ from app.schemas.ticket import (
 )
 from app.schemas.lista_paginada import ListaPaginada
 from app.core.auth import obter_atendente_atual
+from app.core.setor_scope import ids_setores_visiveis_atendente, atendente_atende_algum_id_setor
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
@@ -45,17 +46,27 @@ def _ticket_para_read(t: Ticket) -> TicketRead:
         created_at=t.created_at,
         updated_at=t.updated_at,
         empresa_nome=t.empresa.nome if t.empresa else None,
+        rede_nome=t.empresa.rede.nome if t.empresa and t.empresa.rede else None,
         setor_nome=t.setor.nome if t.setor else None,
         status_nome=t.status.nome if t.status else None,
         atendente_nome=t.atendente.nome if t.atendente else None,
     )
 
 
-def _pode_ver_ticket(atendente: Atendente, ticket: Ticket) -> bool:
+def _pode_ver_ticket(db: Session, atendente: Atendente, ticket: Ticket) -> bool:
     if atendente.role == "admin":
         return True
-    setor_ids = [s.id for s in atendente.setores]
-    return ticket.setor_id in setor_ids
+    vis = ids_setores_visiveis_atendente(db, atendente)
+    return ticket.setor_id in vis
+
+
+def _pode_enviar_mensagem_publica(atendente: Atendente, ticket: Ticket) -> bool:
+    """Andamento visível na conversa (tipo publico): admin, responsável ou fila sem responsável."""
+    if atendente.role == "admin":
+        return True
+    if ticket.atendente_id is None:
+        return True
+    return ticket.atendente_id == atendente.id
 
 
 @router.get("", response_model=ListaPaginada[TicketRead])
@@ -65,6 +76,15 @@ def listar(
     status_id: int | None = Query(None),
     protocolo: str | None = Query(None, description="Legado: use busca"),
     busca: str | None = Query(None, description="Protocolo, assunto ou nome da empresa"),
+    sem_responsavel: bool = Query(
+        False,
+        description="Somente tickets sem atendente atribuído (fila do setor)",
+    ),
+    meus: bool = Query(False, description="Somente tickets em que você é o responsável"),
+    atendente_id: int | None = Query(
+        None,
+        description="Filtrar por responsável (apenas administradores)",
+    ),
     offset: int = Query(0, ge=0),
     limit: int = Query(_DEFAULT_PAGE, ge=1, le=_MAX_PAGE),
     db: Session = Depends(get_db),
@@ -72,14 +92,25 @@ def listar(
 ):
     q = db.query(Ticket).join(Ticket.empresa).join(Ticket.setor).join(Ticket.status)
     if atendente.role != "admin":
-        setor_ids = [s.id for s in atendente.setores]
-        q = q.filter(Ticket.setor_id.in_(setor_ids))
+        vis = ids_setores_visiveis_atendente(db, atendente)
+        q = q.filter(Ticket.setor_id.in_(vis))
     if empresa_id is not None:
         q = q.filter(Ticket.empresa_id == empresa_id)
     if setor_id is not None:
         q = q.filter(Ticket.setor_id == setor_id)
     if status_id is not None:
         q = q.filter(Ticket.status_id == status_id)
+    if atendente_id is not None:
+        if atendente.role != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Apenas administradores podem filtrar por outro responsável",
+            )
+        q = q.filter(Ticket.atendente_id == atendente_id)
+    elif meus:
+        q = q.filter(Ticket.atendente_id == atendente.id)
+    if sem_responsavel:
+        q = q.filter(Ticket.atendente_id.is_(None))
     if protocolo and protocolo.strip():
         q = q.filter(Ticket.protocolo.ilike(f"%{protocolo.strip()}%"))
     if busca and busca.strip():
@@ -92,7 +123,18 @@ def listar(
             )
         )
     total = q.count()
-    rows = q.order_by(Ticket.created_at.desc()).offset(offset).limit(limit).all()
+    rows = (
+        q.options(
+            joinedload(Ticket.empresa).joinedload(Empresa.rede),
+            joinedload(Ticket.setor),
+            joinedload(Ticket.status),
+            joinedload(Ticket.atendente),
+        )
+        .order_by(Ticket.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
     return ListaPaginada(items=[_ticket_para_read(t) for t in rows], total=total)
 
 
@@ -104,8 +146,8 @@ def criar(
 ):
     # Atendente só pode abrir ticket em setor que ele atende
     if atendente.role != "admin":
-        setor_ids = [s.id for s in atendente.setores]
-        if data.setor_id not in setor_ids:
+        vis = ids_setores_visiveis_atendente(db, atendente)
+        if data.setor_id not in vis:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sem permissão para este setor")
     empresa = db.query(Empresa).filter(Empresa.id == data.empresa_id).first()
     if not empresa:
@@ -113,7 +155,7 @@ def criar(
     setor = db.query(Setor).filter(Setor.id == data.setor_id).first()
     if not setor:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Setor não encontrado")
-    # Status inicial: primeiro status ativo (ex: "aberto")
+    # Status inicial: primeiro status ativo por ordem (ex.: «Aguardando atendimento» na fila do setor)
     status_inicial = db.query(StatusTicket).filter(StatusTicket.ativo.is_(True)).order_by(StatusTicket.ordem).first()
     if not status_inicial:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cadastre ao menos um status de ticket")
@@ -158,10 +200,20 @@ def obter(
     db: Session = Depends(get_db),
     atendente: Atendente = Depends(obter_atendente_atual),
 ):
-    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    ticket = (
+        db.query(Ticket)
+        .options(
+            joinedload(Ticket.empresa).joinedload(Empresa.rede),
+            joinedload(Ticket.setor),
+            joinedload(Ticket.status),
+            joinedload(Ticket.atendente),
+        )
+        .filter(Ticket.id == ticket_id)
+        .first()
+    )
     if not ticket:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket não encontrado")
-    if not _pode_ver_ticket(atendente, ticket):
+    if not _pode_ver_ticket(db, atendente, ticket):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sem permissão para este ticket")
     return _ticket_para_read(ticket)
 
@@ -175,7 +227,7 @@ def historico(
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket não encontrado")
-    if not _pode_ver_ticket(atendente, ticket):
+    if not _pode_ver_ticket(db, atendente, ticket):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sem permissão para este ticket")
     rows = (
         db.query(TicketHistorico)
@@ -220,7 +272,7 @@ def listar_mensagens(
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket não encontrado")
-    if not _pode_ver_ticket(atendente, ticket):
+    if not _pode_ver_ticket(db, atendente, ticket):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sem permissão para este ticket")
     rows = (
         db.query(TicketMensagem)
@@ -242,8 +294,14 @@ def criar_mensagem(
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket não encontrado")
-    if not _pode_ver_ticket(atendente, ticket):
+    if not _pode_ver_ticket(db, atendente, ticket):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sem permissão para este ticket")
+    if data.tipo == "publico" and not _pode_enviar_mensagem_publica(atendente, ticket):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Apenas o responsável pelo chamado ou um administrador pode enviar mensagem da equipe. "
+            "Colaboradores do mesmo setor podem usar comentário interno.",
+        )
     corpo = data.corpo.strip()
     if not corpo:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mensagem vazia")
@@ -286,13 +344,13 @@ def atualizar(
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket não encontrado")
-    if not _pode_ver_ticket(atendente, ticket):
+    if not _pode_ver_ticket(db, atendente, ticket):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sem permissão para este ticket")
     update = data.model_dump(exclude_unset=True)
 
     if "setor_id" in update:
         if atendente.role != "admin":
-            permitidos = {s.id for s in atendente.setores}
+            permitidos = ids_setores_visiveis_atendente(db, atendente)
             if update["setor_id"] not in permitidos:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
@@ -301,6 +359,20 @@ def atualizar(
         novo_setor = db.query(Setor).filter(Setor.id == update["setor_id"]).first()
         if not novo_setor:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Setor não encontrado")
+
+    setor_final = update["setor_id"] if "setor_id" in update else ticket.setor_id
+
+    if "atendente_id" in update and update["atendente_id"] is not None:
+        if not atendente_atende_algum_id_setor(db, update["atendente_id"], setor_final):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="O responsável indicado não está vinculado ao setor do ticket.",
+            )
+
+    # Transferência: se o responsável atual não atende o setor de destino, volta à fila (sem responsável).
+    if "setor_id" in update and update["setor_id"] != ticket.setor_id and "atendente_id" not in update:
+        if ticket.atendente_id is not None and not atendente_atende_algum_id_setor(db, ticket.atendente_id, update["setor_id"]):
+            update["atendente_id"] = None
 
     if "status_id" in update:
         antigo = str(ticket.status_id)

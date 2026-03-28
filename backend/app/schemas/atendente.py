@@ -15,7 +15,7 @@ class AtendenteCreate(AtendenteBase):
 
 
 class AtendenteUpdate(BaseModel):
-    email: EmailStr | None = None
+    email: str | None = None
     nome: str | None = None
     senha: str | None = None
     role: str | None = None
@@ -24,7 +24,10 @@ class AtendenteUpdate(BaseModel):
 
 
 class AtendenteRead(AtendenteBase):
+    """Resposta da API: e-mail vem do banco; não usar EmailStr (legado .test / TLD reservado quebra a listagem)."""
+
     id: int
+    email: str  # type: ignore[assignment]
     created_at: datetime | None = None
     updated_at: datetime | None = None
     setor_ids: list[int] = []
@@ -34,7 +37,9 @@ class AtendenteRead(AtendenteBase):
 
 
 class AtendenteLogin(BaseModel):
-    email: EmailStr
+    """Corpo do login: aceita qualquer string para não bloquear contas legadas no banco."""
+
+    email: str
     senha: str
 
 

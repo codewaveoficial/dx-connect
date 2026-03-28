@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models import Atendente, Setor
 from app.schemas.atendente import AtendenteCreate, AtendenteRead, AtendenteUpdate
 from app.schemas.lista_paginada import ListaPaginada
 from app.core.auth import exigir_admin, obter_atendente_atual
+from app.core.setor_scope import ids_setores_mesmo_nome, ids_setores_visiveis_atendente
 from app.core.security import hash_senha
 from app.core.audit import registrar_audit
 
@@ -45,7 +46,13 @@ def listar_atendentes(
         term = f"%{busca.strip()}%"
         q = q.filter(or_(Atendente.nome.ilike(term), Atendente.email.ilike(term)))
     total = q.count()
-    rows = q.order_by(Atendente.nome).offset(offset).limit(limit).all()
+    rows = (
+        q.options(joinedload(Atendente.setores))
+        .order_by(Atendente.nome)
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
     return ListaPaginada(items=[_atendente_para_read(a) for a in rows], total=total)
 
 
@@ -79,6 +86,33 @@ def criar_atendente(
 @router.get("/me", response_model=AtendenteRead)
 def me(atendente: Atendente = Depends(obter_atendente_atual)):
     return _atendente_para_read(atendente)
+
+
+@router.get("/por-setor/{setor_id}", response_model=list[AtendenteRead])
+def listar_atendentes_por_setor(
+    setor_id: int,
+    incluir_inativos: bool = Query(True, description="Incluir inativos (ex.: responsável atual)"),
+    db: Session = Depends(get_db),
+    atendente_logado: Atendente = Depends(obter_atendente_atual),
+):
+    """Atendentes vinculados ao setor (e duplicatas de mesmo nome). Qualquer usuário autenticado com acesso ao setor."""
+    if not db.query(Setor).filter(Setor.id == setor_id).first():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Setor não encontrado")
+    if atendente_logado.role != "admin":
+        if setor_id not in ids_setores_visiveis_atendente(db, atendente_logado):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sem permissão para este setor")
+    alvo_ids = list(ids_setores_mesmo_nome(db, setor_id))
+    q = (
+        db.query(Atendente)
+        .options(joinedload(Atendente.setores))
+        .join(Atendente.setores)
+        .filter(Setor.id.in_(alvo_ids))
+        .distinct()
+    )
+    if not incluir_inativos:
+        q = q.filter(Atendente.ativo.is_(True))
+    rows = q.order_by(Atendente.nome).all()
+    return [_atendente_para_read(a) for a in rows]
 
 
 @router.get("/{atendente_id}", response_model=AtendenteRead)
