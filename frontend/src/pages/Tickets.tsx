@@ -10,7 +10,7 @@ import { useToast } from '../components/ui/Toast'
 import { useAuth } from '../contexts/AuthContext'
 
 const searchIcon = (
-  <svg className="size-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+  <svg className="size-4 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
   </svg>
 )
@@ -127,16 +127,16 @@ export function Tickets() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Tickets</h1>
-          <p className="mt-1 text-sm text-slate-500">Acompanhe e filtre as demandas do suporte.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Tickets</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Acompanhe e filtre as demandas do suporte.</p>
         </div>
         <Link to="/tickets/novo">
           <Button>Novo ticket</Button>
         </Link>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm">
-        <div className="border-b border-slate-100 bg-gradient-to-b from-slate-50/90 to-slate-50/40 px-4 py-5 sm:px-6">
+      <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900/40">
+        <div className="border-b border-slate-100 bg-gradient-to-b from-slate-50/90 to-slate-50/40 px-4 py-5 dark:border-slate-800 dark:from-slate-800/40 dark:to-slate-900/20 sm:px-6">
           <div className="relative max-w-2xl">
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2">{searchIcon}</span>
             <input
@@ -145,7 +145,7 @@ export function Tickets() {
               onChange={(e) => setBusca(e.target.value)}
               placeholder="Protocolo, assunto ou empresa…"
               disabled={loading}
-              className="w-full rounded-xl border-0 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm ring-1 ring-slate-200/80 transition-shadow focus:outline-none focus:ring-2 focus:ring-slate-400/25"
+              className="w-full rounded-xl border-0 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 shadow-sm ring-1 ring-slate-200/80 transition-shadow placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400/25 dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-700 dark:placeholder:text-slate-500"
               aria-label="Buscar tickets"
             />
           </div>
@@ -190,7 +190,7 @@ export function Tickets() {
               <button
                 type="button"
                 onClick={limparFiltros}
-                className="shrink-0 self-start text-sm font-medium text-slate-600 underline decoration-slate-300 underline-offset-2 transition-colors hover:text-slate-900 sm:self-auto lg:mb-0.5"
+                className="shrink-0 self-start text-sm font-medium text-slate-600 underline decoration-slate-300 underline-offset-2 transition-colors hover:text-slate-900 dark:text-slate-400 dark:decoration-slate-600 dark:hover:text-slate-200 sm:self-auto lg:mb-0.5"
               >
                 Limpar filtros
               </button>
@@ -198,18 +198,18 @@ export function Tickets() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-6">
-          <p className="text-xs text-slate-500">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800 sm:px-6">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             {loading ? (
               'Carregando…'
             ) : total === 0 ? (
               'Nenhum resultado'
             ) : (
               <>
-                <span className="font-medium text-slate-700">
+                <span className="font-medium text-slate-700 dark:text-slate-300">
                   {inicio}–{fim}
                 </span>
-                <span className="text-slate-400"> de </span>
+                <span className="text-slate-400 dark:text-slate-500"> de </span>
                 {total}
               </>
             )}
@@ -219,18 +219,18 @@ export function Tickets() {
               type="button"
               disabled={loading || page <= 1}
               onClick={() => setPage((p) => p - 1)}
-              className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:pointer-events-none disabled:opacity-40"
+              className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:pointer-events-none disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800"
             >
               Anterior
             </button>
-            <span className="min-w-[4rem] text-center text-xs tabular-nums text-slate-500">
+            <span className="min-w-[4rem] text-center text-xs tabular-nums text-slate-500 dark:text-slate-400">
               {page} / {totalPages}
             </span>
             <button
               type="button"
               disabled={loading || page >= totalPages}
               onClick={() => setPage((p) => p + 1)}
-              className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:pointer-events-none disabled:opacity-40"
+              className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:pointer-events-none disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800"
             >
               Próxima
             </button>
@@ -238,14 +238,18 @@ export function Tickets() {
         </div>
 
         {loading ? (
-          <div className="px-4 py-16 text-center text-sm text-slate-500 sm:px-6">Carregando lista…</div>
+          <div className="px-4 py-16 text-center text-sm text-slate-500 dark:text-slate-400 sm:px-6">Carregando lista…</div>
         ) : list.length === 0 ? (
-          <div className="px-4 py-16 text-center text-sm text-slate-500 sm:px-6">
+          <div className="px-4 py-16 text-center text-sm text-slate-500 dark:text-slate-400 sm:px-6">
             Nenhum ticket encontrado.
             {temFiltrosAtivos && (
               <>
                 {' '}
-                <button type="button" onClick={limparFiltros} className="font-medium text-slate-800 underline">
+                <button
+                  type="button"
+                  onClick={limparFiltros}
+                  className="font-medium text-slate-800 underline dark:text-slate-200"
+                >
                   Limpar filtros
                 </button>
               </>
@@ -255,31 +259,31 @@ export function Tickets() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/60">
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6">
+                <tr className="border-b border-slate-100 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-800/40">
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6 dark:text-slate-400">
                     Protocolo
                   </th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6">
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6 dark:text-slate-400">
                     Empresa
                   </th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6">
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6 dark:text-slate-400">
                     Setor
                   </th>
-                  <th className="min-w-[8rem] px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6">
+                  <th className="min-w-[8rem] px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6 dark:text-slate-400">
                     Assunto
                   </th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6">
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6 dark:text-slate-400">
                     Status
                   </th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6">
+                  <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6 dark:text-slate-400">
                     Responsável
                   </th>
-                  <th className="w-px whitespace-nowrap px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6">
+                  <th className="w-px whitespace-nowrap px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6 dark:text-slate-400">
                     <span className="sr-only">Ações</span>
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {list.map((t) => (
                   <tr
                     key={t.id}
@@ -292,28 +296,35 @@ export function Tickets() {
                         navigate(`/tickets/${t.id}`)
                       }
                     }}
-                    className="cursor-pointer transition-colors hover:bg-slate-50/90 focus:outline-none focus-visible:bg-slate-100/80"
+                    className="cursor-pointer transition-colors hover:bg-slate-50/90 focus:outline-none focus-visible:bg-slate-100/80 dark:hover:bg-slate-800/50 dark:focus-visible:bg-slate-800/60"
                   >
-                    <td className="whitespace-nowrap px-4 py-3.5 font-mono text-sm text-slate-900 sm:px-6">
+                    <td className="whitespace-nowrap px-4 py-3.5 font-mono text-sm text-slate-900 sm:px-6 dark:text-slate-100">
                       {t.protocolo}
                     </td>
-                    <td className="max-w-[10rem] truncate px-4 py-3.5 text-slate-700 sm:max-w-[12rem] sm:px-6" title={t.empresa_nome}>
+                    <td
+                      className="max-w-[10rem] truncate px-4 py-3.5 text-slate-700 sm:max-w-[12rem] sm:px-6 dark:text-slate-300"
+                      title={t.empresa_nome}
+                    >
                       {t.empresa_nome ?? t.empresa_id}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-slate-600 sm:px-6">{t.setor_nome ?? t.setor_id}</td>
-                    <td className="max-w-xs truncate px-4 py-3.5 font-medium text-slate-900 sm:px-6" title={t.assunto}>
+                    <td className="whitespace-nowrap px-4 py-3.5 text-slate-600 sm:px-6 dark:text-slate-400">
+                      {t.setor_nome ?? t.setor_id}
+                    </td>
+                    <td className="max-w-xs truncate px-4 py-3.5 font-medium text-slate-900 sm:px-6 dark:text-slate-100" title={t.assunto}>
                       {t.assunto}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3.5 sm:px-6">
-                      <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
+                      <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                         {t.status_nome ?? t.status_id}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-slate-600 sm:px-6">{t.atendente_nome ?? '—'}</td>
+                    <td className="whitespace-nowrap px-4 py-3.5 text-slate-600 sm:px-6 dark:text-slate-400">
+                      {t.atendente_nome ?? '—'}
+                    </td>
                     <td className="px-4 py-3.5 text-right sm:px-6" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
-                        className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                        className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                         onClick={() => navigate(`/tickets/${t.id}`)}
                         aria-label={`Abrir ticket ${t.protocolo}`}
                       >

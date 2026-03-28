@@ -23,7 +23,7 @@ export function Dashboard() {
   if (loading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <span className="text-slate-500">Carregando dashboard...</span>
+        <span className="text-slate-500 dark:text-slate-400">Carregando dashboard...</span>
       </div>
     )
   }
@@ -41,7 +41,7 @@ export function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-slate-800">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Dashboard</h1>
         <Link to="/tickets/novo">
           <Button>Novo ticket</Button>
         </Link>
@@ -50,23 +50,23 @@ export function Dashboard() {
       {/* Cards de resumo */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card className="border-l-4 border-l-slate-400">
-          <p className="text-sm font-medium text-slate-500">Total de tickets</p>
-          <p className="mt-1 text-3xl font-bold text-slate-800">{resumo.total_tickets}</p>
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total de tickets</p>
+          <p className="mt-1 text-3xl font-bold text-slate-800 dark:text-slate-100">{resumo.total_tickets}</p>
         </Card>
         <Card className="border-l-4 border-l-amber-400">
-          <p className="text-sm font-medium text-slate-500">Abertos hoje</p>
-          <p className="mt-1 text-3xl font-bold text-slate-800">{resumo.abertos_hoje}</p>
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Abertos hoje</p>
+          <p className="mt-1 text-3xl font-bold text-slate-800 dark:text-slate-100">{resumo.abertos_hoje}</p>
         </Card>
         <Card className="border-l-4 border-l-emerald-400 sm:col-span-2 lg:col-span-1">
-          <p className="text-sm font-medium text-slate-500">Por status</p>
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Por status</p>
           <ul className="mt-2 space-y-1">
             {resumo.por_status.length === 0 ? (
-              <li className="text-slate-500">Nenhum ticket</li>
+              <li className="text-slate-500 dark:text-slate-400">Nenhum ticket</li>
             ) : (
               resumo.por_status.map((s) => (
                 <li key={s.status_id} className="flex justify-between text-sm">
-                  <span className="text-slate-600">{s.status_nome}</span>
-                  <span className="font-medium text-slate-800">{s.total}</span>
+                  <span className="text-slate-600 dark:text-slate-400">{s.status_nome}</span>
+                  <span className="font-medium text-slate-800 dark:text-slate-100">{s.total}</span>
                 </li>
               ))
             )}
@@ -77,12 +77,12 @@ export function Dashboard() {
       {/* Últimos tickets */}
       <Card title="Últimos tickets">
         {ultimos_tickets.length === 0 ? (
-          <p className="text-slate-500">Nenhum ticket ainda.</p>
+          <p className="text-slate-500 dark:text-slate-400">Nenhum ticket ainda.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-slate-600">
+                <tr className="border-b border-slate-200 dark:border-slate-700/80 text-slate-600 dark:text-slate-400">
                   <th className="pb-2 pr-4 font-medium">Protocolo</th>
                   <th className="pb-2 pr-4 font-medium">Empresa</th>
                   <th className="pb-2 pr-4 font-medium">Assunto</th>
@@ -92,8 +92,8 @@ export function Dashboard() {
               </thead>
               <tbody>
                 {ultimos_tickets.map((t) => (
-                  <tr key={t.id} className="border-b border-slate-100">
-                    <td className="py-3 pr-4 font-mono text-slate-800">{t.protocolo}</td>
+                  <tr key={t.id} className="border-b border-slate-100 dark:border-slate-700/60">
+                    <td className="py-3 pr-4 font-mono text-slate-800 dark:text-slate-100">{t.protocolo}</td>
                     <td className="py-3 pr-4">{t.empresa_nome ?? t.empresa_id}</td>
                     <td className="py-3 pr-4">{t.assunto}</td>
                     <td className="py-3 pr-4">{t.status_nome ?? t.status_id}</td>
@@ -106,7 +106,7 @@ export function Dashboard() {
                         <Button
                           type="button"
                           variant="ghost"
-                          className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white p-0 text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-900"
+                          className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white p-0 text-slate-600 shadow-sm hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700/80 dark:bg-slate-900/50 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-100"
                         >
                           <IconEye className="size-5 shrink-0" ariaHidden={false} />
                         </Button>

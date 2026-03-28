@@ -96,7 +96,7 @@ export function StatusTicketPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between">
-        <h1 className="text-2xl font-bold text-slate-800">Status de ticket</h1>
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Status de ticket</h1>
         <Button onClick={openCreate}>Novo status</Button>
       </div>
       {!modalOpen && (
@@ -112,11 +112,11 @@ export function StatusTicketPage() {
             extra={<FiltroInativos incluirInativos={incluirInativos} onChange={setIncluirInativos} />}
           />
         {loading ? (
-          <p className="text-slate-500">Carregando...</p>
+          <p className="text-slate-500 dark:text-slate-400">Carregando...</p>
         ) : list.length === 0 ? (
-          <p className="text-slate-500">Nenhum status encontrado.</p>
+          <p className="text-slate-500 dark:text-slate-400">Nenhum status encontrado.</p>
         ) : (
-          <ul className="divide-y divide-slate-200">
+          <ul className="divide-y divide-slate-200 dark:divide-slate-700">
             {list.map((s) => (
               <li
                 key={s.id}
@@ -124,12 +124,12 @@ export function StatusTicketPage() {
                 tabIndex={0}
                 onClick={() => openEdit(s)}
                 onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openEdit(s); } }}
-                className="flex cursor-pointer items-center justify-between rounded-lg py-3 px-2 -mx-2 transition-colors duration-150 hover:bg-slate-50/80 focus:outline-none focus:bg-slate-50/80"
+                className="flex cursor-pointer items-center justify-between rounded-lg py-3 px-2 -mx-2 transition-colors duration-150 hover:bg-slate-50 dark:bg-slate-800/40 dark:hover:bg-slate-800/60/80 dark:hover:bg-slate-800/50 focus:outline-none focus:bg-slate-50 dark:bg-slate-800/40 dark:focus:bg-slate-800/40/80"
               >
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <span className={`font-medium ${s.ativo ? 'text-slate-800' : 'text-slate-400'}`}>{s.nome}</span>
-                  {!s.ativo && <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600">Inativo</span>}
-                  <span className="text-slate-500 text-sm">{s.slug}</span>
+                  <span className={`font-medium ${s.ativo ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>{s.nome}</span>
+                  {!s.ativo && <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600 dark:text-slate-400">Inativo</span>}
+                  <span className="text-slate-500 dark:text-slate-400 text-sm">{s.slug}</span>
                   <span className="text-slate-400">ordem: {s.ordem}</span>
                 </div>
                 <div className="shrink-0" onClick={(ev) => ev.stopPropagation()}>

@@ -131,7 +131,7 @@ export function Atendentes() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between">
-        <h1 className="text-2xl font-bold text-slate-800">Atendentes</h1>
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Atendentes</h1>
         <Button onClick={openCreate}>Novo atendente</Button>
       </div>
       {!modalOpen && (
@@ -147,11 +147,11 @@ export function Atendentes() {
             extra={<FiltroInativos incluirInativos={incluirInativos} onChange={setIncluirInativos} />}
           />
         {loading ? (
-          <p className="text-slate-500">Carregando...</p>
+          <p className="text-slate-500 dark:text-slate-400">Carregando...</p>
         ) : list.length === 0 ? (
-          <p className="text-slate-500">Nenhum atendente encontrado.</p>
+          <p className="text-slate-500 dark:text-slate-400">Nenhum atendente encontrado.</p>
         ) : (
-          <ul className="divide-y divide-slate-200">
+          <ul className="divide-y divide-slate-200 dark:divide-slate-700">
             {list.map((a) => (
               <li
                 key={a.id}
@@ -159,12 +159,12 @@ export function Atendentes() {
                 tabIndex={0}
                 onClick={() => openEdit(a)}
                 onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openEdit(a); } }}
-                className="flex cursor-pointer items-center justify-between rounded-lg py-3 px-2 -mx-2 transition-colors duration-150 hover:bg-slate-50/80 focus:outline-none focus:bg-slate-50/80"
+                className="flex cursor-pointer items-center justify-between rounded-lg py-3 px-2 -mx-2 transition-colors duration-150 hover:bg-slate-50 dark:bg-slate-800/40 dark:hover:bg-slate-800/60/80 dark:hover:bg-slate-800/50 focus:outline-none focus:bg-slate-50 dark:bg-slate-800/40 dark:focus:bg-slate-800/40/80"
               >
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <span className={`font-medium ${a.ativo ? 'text-slate-800' : 'text-slate-400'}`}>{a.nome}</span>
-                  {!a.ativo && <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600">Inativo</span>}
-                  <span className="text-slate-500">{a.email}</span>
+                  <span className={`font-medium ${a.ativo ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>{a.nome}</span>
+                  {!a.ativo && <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600 dark:text-slate-400">Inativo</span>}
+                  <span className="text-slate-500 dark:text-slate-400">{a.email}</span>
                   <span className="text-xs text-slate-400">({a.role})</span>
                 </div>
                 <div className="shrink-0" onClick={(ev) => ev.stopPropagation()}>
@@ -202,7 +202,7 @@ export function Atendentes() {
               />
               {role === 'atendente' && (
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Setores</label>
+                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Setores</label>
                   <div className="flex flex-wrap gap-2">
                     {setoresList.map((s) => (
                       <CheckboxField

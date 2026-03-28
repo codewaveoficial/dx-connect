@@ -2,8 +2,19 @@ import { mensagemErroApi } from './errorMessage'
 
 const BASE = import.meta.env.DEV ? '/api' : (import.meta.env.VITE_API_URL ?? 'http://localhost:8000');
 
+const TOKEN_KEY = 'token'
+
 function getToken(): string | null {
-  return localStorage.getItem('token');
+  return sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY);
+}
+
+export function getAuthToken(): string | null {
+  return getToken();
+}
+
+export function clearAuthToken(): void {
+  sessionStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(TOKEN_KEY)
 }
 
 export async function api<T>(
@@ -31,7 +42,7 @@ export async function api<T>(
 
   if (res.status === 401) {
     const err = await res.json().catch(() => ({}));
-    localStorage.removeItem('token');
+    clearAuthToken();
     window.location.href = '/login';
     throw new Error(mensagemErroApi(err, 401));
   }

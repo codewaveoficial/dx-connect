@@ -1,10 +1,10 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
-import { atendentes, type Atendentes } from '../api/client'
+import { atendentes, clearAuthToken, getAuthToken, type Atendentes } from '../api/client'
 
 interface AuthContextValue {
   user: Atendentes.Atendente | null
   loading: boolean
-  login: (email: string, senha: string) => Promise<void>
+  login: (email: string, senha: string, lembrarMe?: boolean) => Promise<void>
   logout: () => void
   refreshUser: () => Promise<void>
   isAdmin: boolean
@@ -17,7 +17,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const refreshUser = useCallback(async () => {
-    const token = localStorage.getItem('token')
+    const token = getAuthToken()
     if (!token) {
       setUser(null)
       setLoading(false)
@@ -28,7 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(me)
     } catch {
       setUser(null)
-      localStorage.removeItem('token')
+      clearAuthToken()
     } finally {
       setLoading(false)
     }
@@ -38,15 +38,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUser()
   }, [refreshUser])
 
-  const login = useCallback(async (email: string, senha: string) => {
+  const login = useCallback(async (email: string, senha: string, lembrarMe = true) => {
     const { auth } = await import('../api/client')
     const res = await auth.login(email, senha)
-    localStorage.setItem('token', res.access_token)
+    clearAuthToken()
+    if (lembrarMe) {
+      localStorage.setItem('token', res.access_token)
+    } else {
+      sessionStorage.setItem('token', res.access_token)
+    }
     await refreshUser()
   }, [refreshUser])
 
   const logout = useCallback(() => {
-    localStorage.removeItem('token')
+    clearAuthToken()
     setUser(null)
   }, [])
 

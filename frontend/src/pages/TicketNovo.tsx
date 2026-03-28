@@ -95,35 +95,39 @@ export function TicketNovo() {
 
   return (
     <div className="space-y-6">
-      <nav aria-label="breadcrumb" className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+      <nav aria-label="breadcrumb" className="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
         <button
           type="button"
           onClick={() => navigate('/tickets')}
-          className="font-medium text-slate-600 hover:text-slate-900"
+          className="font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
         >
           Tickets
         </button>
-        <span aria-hidden className="text-slate-300">
+        <span aria-hidden className="text-slate-300 dark:text-slate-600">
           /
         </span>
-        <span className="font-semibold text-slate-800">Novo</span>
+        <span className="font-semibold text-slate-800 dark:text-slate-100">Novo</span>
       </nav>
 
-      <h1 className="text-2xl font-bold text-slate-800">Novo ticket</h1>
+      <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Novo ticket</h1>
 
       {semSetorPermitido && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-100">
           Você não está vinculado a nenhum setor ativo. Peça a um administrador para associar setores ao seu usuário
           antes de abrir tickets.
         </div>
       )}
 
       <Card title="Abrir ticket">
-        <p className="mb-4 text-sm text-slate-600">
+        <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
           O <strong>responsável</strong> (atendente) é opcional na abertura: você pode deixar em branco e atribuir depois na tela do ticket.
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+          {error && (
+            <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+              {error}
+            </div>
+          )}
 
           <SelectComPesquisa
             id="ticket-empresa"
@@ -150,7 +154,7 @@ export function TicketNovo() {
               disabled={semSetorPermitido}
             />
             {!isAdmin && setoresFiltrados.length > 0 && (
-              <p className="mt-1 text-xs text-slate-500">Somente setores aos quais você está vinculado.</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Somente setores aos quais você está vinculado.</p>
             )}
           </div>
 
@@ -162,8 +166,8 @@ export function TicketNovo() {
             disabled={semSetorPermitido}
           />
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Relato do problema *</label>
-            <p className="mb-2 text-xs text-slate-500">
+            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Relato do problema *</label>
+            <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
               Este texto entra como primeira mensagem do ticket (solicitação inicial).
             </p>
             <textarea
@@ -172,7 +176,7 @@ export function TicketNovo() {
               rows={5}
               required
               disabled={semSetorPermitido}
-              className="w-full rounded-xl border-0 bg-white px-3 py-2 text-sm shadow-sm ring-1 ring-slate-200/90 focus:outline-none focus:ring-2 focus:ring-slate-400/35"
+              className="w-full rounded-xl border-0 bg-white px-3 py-2 text-sm shadow-sm ring-1 ring-slate-200/90 focus:outline-none focus:ring-2 focus:ring-slate-400/35 dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-700"
             />
           </div>
           <div className="flex flex-wrap gap-2">

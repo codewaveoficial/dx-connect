@@ -103,7 +103,7 @@ export function TiposNegocio() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between">
-        <h1 className="text-2xl font-bold text-slate-800">Tipos de negócio</h1>
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Tipos de negócio</h1>
         <Button onClick={openCreate}>Novo tipo</Button>
       </div>
       {!modalOpen && (
@@ -119,11 +119,11 @@ export function TiposNegocio() {
             extra={<FiltroInativos incluirInativos={incluirInativos} onChange={setIncluirInativos} />}
           />
         {loading ? (
-          <p className="text-slate-500">Carregando...</p>
+          <p className="text-slate-500 dark:text-slate-400">Carregando...</p>
         ) : list.length === 0 ? (
-          <p className="text-slate-500">Nenhum tipo encontrado.</p>
+          <p className="text-slate-500 dark:text-slate-400">Nenhum tipo encontrado.</p>
         ) : (
-          <ul className="divide-y divide-slate-200">
+          <ul className="divide-y divide-slate-200 dark:divide-slate-700">
             {list.map((t) => (
               <li
                 key={t.id}
@@ -131,11 +131,11 @@ export function TiposNegocio() {
                 tabIndex={0}
                 onClick={() => openEdit(t)}
                 onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openEdit(t); } }}
-                className="flex cursor-pointer items-center justify-between rounded-lg py-3 px-2 -mx-2 transition-colors duration-150 hover:bg-slate-50/80 focus:outline-none focus:bg-slate-50/80"
+                className="flex cursor-pointer items-center justify-between rounded-lg py-3 px-2 -mx-2 transition-colors duration-150 hover:bg-slate-50 dark:bg-slate-800/40 dark:hover:bg-slate-800/60/80 dark:hover:bg-slate-800/50 focus:outline-none focus:bg-slate-50 dark:bg-slate-800/40 dark:focus:bg-slate-800/40/80"
               >
                 <div className="flex min-w-0 items-center gap-2">
-                  <span className={`font-medium ${t.ativo ? 'text-slate-800' : 'text-slate-400'}`}>{t.nome}</span>
-                  {!t.ativo && <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600">Inativo</span>}
+                  <span className={`font-medium ${t.ativo ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>{t.nome}</span>
+                  {!t.ativo && <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600 dark:text-slate-400">Inativo</span>}
                 </div>
                 <div className="flex shrink-0 gap-1.5" onClick={(ev) => ev.stopPropagation()}>
                   <Button variant="ghost" onClick={() => openEdit(t)} aria-label="Editar">

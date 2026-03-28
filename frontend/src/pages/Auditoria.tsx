@@ -62,8 +62,10 @@ export function Auditoria() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-800">Auditoria</h1>
-      <p className="text-slate-600 text-sm">Registro de cadastros e alterações: quem fez e quando.</p>
+      <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Auditoria</h1>
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        Registro de cadastros e alterações: quem fez e quando.
+      </p>
       <Card>
         <BarraBuscaPaginacao
           busca={busca}
@@ -88,14 +90,14 @@ export function Auditoria() {
           }
         />
         {loading ? (
-          <p className="text-slate-500">Carregando...</p>
+          <p className="text-slate-500 dark:text-slate-400">Carregando...</p>
         ) : list.length === 0 ? (
-          <p className="text-slate-500">Nenhum registro de auditoria.</p>
+          <p className="text-slate-500 dark:text-slate-400">Nenhum registro de auditoria.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-slate-600">
+                <tr className="border-b border-slate-200 dark:border-slate-700/80 text-slate-600 dark:text-slate-400">
                   <th className="pb-2 pr-4 font-medium">Data/Hora</th>
                   <th className="pb-2 pr-4 font-medium">Tipo</th>
                   <th className="pb-2 pr-4 font-medium">ID</th>
@@ -105,12 +107,12 @@ export function Auditoria() {
               </thead>
               <tbody>
                 {list.map((r) => (
-                  <tr key={r.id} className="border-b border-slate-100">
-                    <td className="py-2 pr-4 text-slate-600">
+                  <tr key={r.id} className="border-b border-slate-100 dark:border-slate-700/60">
+                    <td className="py-2 pr-4 text-slate-600 dark:text-slate-400">
                       {r.created_at ? new Date(r.created_at).toLocaleString('pt-BR') : '—'}
                     </td>
                     <td className="py-2 pr-4">{entityTypeLabel[r.entity_type] ?? r.entity_type}</td>
-                    <td className="py-2 pr-4 font-mono text-slate-600">{r.entity_id}</td>
+                    <td className="py-2 pr-4 font-mono text-slate-600 dark:text-slate-400">{r.entity_id}</td>
                     <td className="py-2 pr-4">{actionLabel[r.action] ?? r.action}</td>
                     <td className="py-2">{r.atendente_nome ?? '—'}</td>
                   </tr>

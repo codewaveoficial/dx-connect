@@ -105,7 +105,7 @@ export function Redes() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between">
-        <h1 className="text-2xl font-bold text-slate-800">Redes</h1>
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Redes</h1>
         <Button onClick={openCreate}>Nova rede</Button>
       </div>
       {!modalOpen && (
@@ -121,11 +121,11 @@ export function Redes() {
             extra={<FiltroInativos incluirInativos={incluirInativos} onChange={setIncluirInativos} />}
           />
           {loading ? (
-            <p className="text-slate-500">Carregando...</p>
+            <p className="text-slate-500 dark:text-slate-400">Carregando...</p>
           ) : list.length === 0 ? (
-            <p className="text-slate-500">Nenhuma rede encontrada.</p>
+            <p className="text-slate-500 dark:text-slate-400">Nenhuma rede encontrada.</p>
           ) : (
-            <ul className="divide-y divide-slate-200">
+            <ul className="divide-y divide-slate-200 dark:divide-slate-700">
               {list.map((r) => (
                 <li
                   key={r.id}
@@ -138,14 +138,16 @@ export function Redes() {
                       navigate(`/redes/${r.id}`)
                     }
                   }}
-                  className="flex cursor-pointer items-center justify-between rounded-lg py-3 px-2 -mx-2 transition-colors duration-150 hover:bg-slate-50/80 focus:outline-none focus:bg-slate-50/80"
+                  className="flex cursor-pointer items-center justify-between rounded-lg py-3 px-2 -mx-2 transition-colors duration-150 hover:bg-slate-50/80 focus:outline-none focus:bg-slate-50/80 dark:hover:bg-slate-800/50 dark:focus:bg-slate-800/60"
                 >
                   <div className="flex min-w-0 items-center gap-2">
-                    <span className={`truncate font-medium ${r.ativo ? 'text-slate-800' : 'text-slate-400'}`}>
+                    <span className={`truncate font-medium ${r.ativo ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>
                       {r.nome}
                     </span>
                     {!r.ativo && (
-                      <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600">Inativo</span>
+                      <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-400">
+                        Inativo
+                      </span>
                     )}
                   </div>
                   <div className="flex shrink-0 gap-1.5" onClick={(e) => e.stopPropagation()}>
