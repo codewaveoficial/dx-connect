@@ -19,15 +19,19 @@ import { FiltroInativos } from '../components/ui/FiltroInativos'
 import { SelectComPesquisa } from '../components/ui/SelectComPesquisa'
 import { Select } from '../components/ui/Select'
 import { BarraBuscaPaginacao, PAGE_SIZE_PADRAO } from '../components/ui/BarraBuscaPaginacao'
+import { CabecalhoOrdenavel } from '../components/ui/CabecalhoOrdenavel'
+import { useOrdenacaoLista } from '../hooks/useOrdenacaoLista'
 import { Switch } from '../components/ui/Switch'
 import { CheckboxField } from '../components/ui/CheckboxField'
 
 type Tipo = 'socio' | 'supervisor' | 'colaborador'
+type ColunaFuncionario = 'nome' | 'email' | 'tipo'
 
 export function FuncionariosRede() {
   const location = useLocation()
   const navigate = useNavigate()
   const toast = useToast()
+  const { ordenarPor, ordem, aoOrdenarColuna, sortParams } = useOrdenacaoLista<ColunaFuncionario>()
   const [list, setList] = useState<FuncionarioRedeTipo.Funcionario[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -56,7 +60,7 @@ export function FuncionariosRede() {
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedBusca, incluirInativos])
+  }, [debouncedBusca, incluirInativos, ordenarPor, ordem])
 
   function load(override?: { busca?: string; page?: number }) {
     setLoading(true)
@@ -66,6 +70,7 @@ export function FuncionariosRede() {
       .list({
         incluir_inativos: incluirInativos,
         busca: buscaEff.trim() || undefined,
+        ...sortParams,
         offset: (pageEff - 1) * PAGE_SIZE_PADRAO,
         limit: PAGE_SIZE_PADRAO,
       })
@@ -78,7 +83,7 @@ export function FuncionariosRede() {
 
   useEffect(() => {
     load()
-  }, [page, debouncedBusca, incluirInativos])
+  }, [page, debouncedBusca, incluirInativos, ordenarPor, ordem])
 
   useEffect(() => {
     coletarTodasPaginas<Redes.Rede>((o, l) => redes.list({ incluir_inativos: true, offset: o, limit: l })).then(
@@ -342,47 +347,71 @@ export function FuncionariosRede() {
           ) : list.length === 0 ? (
             <p className="text-slate-500">Nenhum cadastrado.</p>
           ) : (
-            <ul className="divide-y divide-slate-200">
-              {list.map((f) => (
-                <li
-                  key={f.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => navigate(`/funcionarios-rede/${f.id}`)}
-                  onKeyDown={(ev) => {
-                    if (ev.key === 'Enter' || ev.key === ' ') {
-                      ev.preventDefault()
-                      navigate(`/funcionarios-rede/${f.id}`)
-                    }
-                  }}
-                  className="flex cursor-pointer items-center justify-between rounded-lg py-3 px-2 -mx-2 transition-colors duration-150 hover:bg-slate-50/80 focus:outline-none focus:bg-slate-50/80"
-                >
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className={`font-medium ${f.ativo ? 'text-slate-800' : 'text-slate-400'}`}>{f.nome}</span>
-                    {!f.ativo && (
-                      <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600">Inativo</span>
-                    )}
-                    <span className="text-slate-500">{f.email}</span>
-                    <span className="text-xs text-slate-400">({tipoLabel[f.tipo as Tipo]})</span>
-                  </div>
-                  <div className="flex shrink-0 gap-1.5" onClick={(ev) => ev.stopPropagation()}>
-                    <Button
-                      variant="ghost"
-                      onClick={(ev) => {
-                        ev.stopPropagation()
-                        openEdit(f)
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-800/40">
+                    <CabecalhoOrdenavel coluna="nome" rotulo="Nome" ordenarPor={ordenarPor} ordem={ordem} aoOrdenar={aoOrdenarColuna} />
+                    <CabecalhoOrdenavel coluna="email" rotulo="E-mail" ordenarPor={ordenarPor} ordem={ordem} aoOrdenar={aoOrdenarColuna} />
+                    <CabecalhoOrdenavel coluna="tipo" rotulo="Tipo" ordenarPor={ordenarPor} ordem={ordem} aoOrdenar={aoOrdenarColuna} />
+                    <th className="w-px px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500 sm:px-6 dark:text-slate-400">
+                      <span className="sr-only">Ações</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {list.map((f) => (
+                    <tr
+                      key={f.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => navigate(`/funcionarios-rede/${f.id}`)}
+                      onKeyDown={(ev) => {
+                        if (ev.key === 'Enter' || ev.key === ' ') {
+                          ev.preventDefault()
+                          navigate(`/funcionarios-rede/${f.id}`)
+                        }
                       }}
-                      aria-label="Editar funcionário"
+                      className="cursor-pointer transition-colors hover:bg-slate-50/80 focus:outline-none focus-visible:bg-slate-100/80 dark:hover:bg-slate-800/50 dark:focus-visible:bg-slate-800/60"
                     >
-                      <IconPencil ariaHidden={false} />
-                    </Button>
-                    <Button variant="ghost" onClick={() => handleDelete(f.id)} aria-label="Excluir funcionário">
-                      <IconTrash ariaHidden={false} />
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                      <td className="px-4 py-3.5 sm:px-6">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`font-medium ${f.ativo ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>{f.nome}</span>
+                          {!f.ativo && (
+                            <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600 dark:text-slate-400">
+                              Inativo
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="max-w-[14rem] truncate px-4 py-3.5 text-slate-600 sm:px-6 dark:text-slate-400" title={f.email}>
+                        {f.email}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 text-slate-600 sm:px-6 dark:text-slate-400">
+                        {tipoLabel[f.tipo as Tipo]}
+                      </td>
+                      <td className="px-4 py-3.5 text-right sm:px-6" onClick={(ev) => ev.stopPropagation()}>
+                        <div className="inline-flex gap-1.5">
+                          <Button
+                            variant="ghost"
+                            onClick={(ev) => {
+                              ev.stopPropagation()
+                              openEdit(f)
+                            }}
+                            aria-label="Editar funcionário"
+                          >
+                            <IconPencil ariaHidden={false} />
+                          </Button>
+                          <Button variant="ghost" onClick={() => handleDelete(f.id)} aria-label="Excluir funcionário">
+                            <IconTrash ariaHidden={false} />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </Card>
       )}

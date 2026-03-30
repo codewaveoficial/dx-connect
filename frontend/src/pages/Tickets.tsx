@@ -18,7 +18,18 @@ import { IconEye } from '../components/ui/IconEye'
 import { Select } from '../components/ui/Select'
 import { PAGE_SIZE_PADRAO } from '../components/ui/BarraBuscaPaginacao'
 import { useToast } from '../components/ui/Toast'
+import { CabecalhoOrdenavel } from '../components/ui/CabecalhoOrdenavel'
+import { useOrdenacaoLista } from '../hooks/useOrdenacaoLista'
 import { useAuth } from '../contexts/AuthContext'
+
+type ColunaOrdenacao =
+  | 'protocolo'
+  | 'rede'
+  | 'empresa'
+  | 'setor'
+  | 'assunto'
+  | 'status'
+  | 'responsavel'
 
 const searchIcon = (
   <svg className="size-4 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
@@ -49,6 +60,7 @@ export function Tickets() {
   const [filtroAtendente, setFiltroAtendente] = useState<number | ''>('')
   const [maisFiltrosAberto, setMaisFiltrosAberto] = useState(false)
   const painelFiltrosId = useId()
+  const { ordenarPor, ordem, aoOrdenarColuna, sortParams } = useOrdenacaoLista<ColunaOrdenacao>()
 
   const setoresFiltro = useMemo(() => {
     const ativos = setoresOpt.filter((s) => s.ativo)
@@ -127,7 +139,7 @@ export function Tickets() {
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedBusca, filtroStatus, filtroEmpresa, filtroSetor, filtroFila, filtroAtendente])
+  }, [debouncedBusca, filtroStatus, filtroEmpresa, filtroSetor, filtroFila, filtroAtendente, ordenarPor, ordem])
 
   useEffect(() => {
     if (filtroSetor !== '' && !setoresFiltro.some((s) => s.id === filtroSetor)) {
@@ -151,6 +163,7 @@ export function Tickets() {
         meus: filtroFila === 'meus' ? true : undefined,
         atendente_id:
           isAdmin && filtroFila === '' && filtroAtendente !== '' ? Number(filtroAtendente) : undefined,
+        ...sortParams,
         offset: (page - 1) * PAGE_SIZE_PADRAO,
         limit: PAGE_SIZE_PADRAO,
       })
@@ -164,7 +177,18 @@ export function Tickets() {
         setTotal(0)
       })
       .finally(() => setLoading(false))
-  }, [page, debouncedBusca, filtroStatus, filtroEmpresa, filtroSetor, filtroFila, filtroAtendente, isAdmin])
+  }, [
+    page,
+    debouncedBusca,
+    filtroStatus,
+    filtroEmpresa,
+    filtroSetor,
+    filtroFila,
+    filtroAtendente,
+    isAdmin,
+    ordenarPor,
+    ordem,
+  ])
 
   function limparFiltros() {
     setBusca('')
@@ -413,27 +437,56 @@ export function Tickets() {
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-800/40">
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6 dark:text-slate-400">
-                    Protocolo
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6 dark:text-slate-400">
-                    Rede
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6 dark:text-slate-400">
-                    Empresa
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6 dark:text-slate-400">
-                    Setor
-                  </th>
-                  <th className="min-w-[8rem] px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6 dark:text-slate-400">
-                    Assunto
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6 dark:text-slate-400">
-                    Status
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6 dark:text-slate-400">
-                    Responsável
-                  </th>
+                  <CabecalhoOrdenavel
+                    coluna="protocolo"
+                    rotulo="Protocolo"
+                    ordenarPor={ordenarPor}
+                    ordem={ordem}
+                    aoOrdenar={aoOrdenarColuna}
+                  />
+                  <CabecalhoOrdenavel
+                    coluna="rede"
+                    rotulo="Rede"
+                    ordenarPor={ordenarPor}
+                    ordem={ordem}
+                    aoOrdenar={aoOrdenarColuna}
+                  />
+                  <CabecalhoOrdenavel
+                    coluna="empresa"
+                    rotulo="Empresa"
+                    ordenarPor={ordenarPor}
+                    ordem={ordem}
+                    aoOrdenar={aoOrdenarColuna}
+                  />
+                  <CabecalhoOrdenavel
+                    coluna="setor"
+                    rotulo="Setor"
+                    ordenarPor={ordenarPor}
+                    ordem={ordem}
+                    aoOrdenar={aoOrdenarColuna}
+                  />
+                  <CabecalhoOrdenavel
+                    coluna="assunto"
+                    rotulo="Assunto"
+                    ordenarPor={ordenarPor}
+                    ordem={ordem}
+                    aoOrdenar={aoOrdenarColuna}
+                    className="min-w-[8rem]"
+                  />
+                  <CabecalhoOrdenavel
+                    coluna="status"
+                    rotulo="Status"
+                    ordenarPor={ordenarPor}
+                    ordem={ordem}
+                    aoOrdenar={aoOrdenarColuna}
+                  />
+                  <CabecalhoOrdenavel
+                    coluna="responsavel"
+                    rotulo="Responsável"
+                    ordenarPor={ordenarPor}
+                    ordem={ordem}
+                    aoOrdenar={aoOrdenarColuna}
+                  />
                   <th className="w-px whitespace-nowrap px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6 dark:text-slate-400">
                     <span className="sr-only">Abrir ticket</span>
                   </th>

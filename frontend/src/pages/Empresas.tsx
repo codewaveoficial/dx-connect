@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { CabecalhoOrdenavel } from '../components/ui/CabecalhoOrdenavel'
+import { useOrdenacaoLista } from '../hooks/useOrdenacaoLista'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { empresas as apiEmpresas, redes, tiposNegocio, type Empresas, type Redes, type TiposNegocio } from '../api/client'
 import { coletarTodasPaginas } from '../api/collectPages'
@@ -15,8 +17,11 @@ import { maskCnpjCpf, digitsOnly, isCnpj } from '../utils/maskCnpjCpf'
 import { BarraBuscaPaginacao, PAGE_SIZE_PADRAO } from '../components/ui/BarraBuscaPaginacao'
 import { Switch } from '../components/ui/Switch'
 
+type ColunaEmpresa = 'nome' | 'cnpj_cpf' | 'rede'
+
 export function Empresas() {
   const navigate = useNavigate()
+  const { ordenarPor, ordem, aoOrdenarColuna, sortParams } = useOrdenacaoLista<ColunaEmpresa>()
   const location = useLocation()
   const toast = useToast()
   const [list, setList] = useState<Empresas.Empresa[]>([])
@@ -58,7 +63,7 @@ export function Empresas() {
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedBusca, incluirInativos])
+  }, [debouncedBusca, incluirInativos, ordenarPor, ordem])
 
   function load() {
     setLoading(true)
@@ -66,6 +71,7 @@ export function Empresas() {
       .list({
         incluir_inativos: incluirInativos,
         busca: debouncedBusca || undefined,
+        ...sortParams,
         offset: (page - 1) * PAGE_SIZE_PADRAO,
         limit: PAGE_SIZE_PADRAO,
       })
@@ -78,7 +84,7 @@ export function Empresas() {
 
   useEffect(() => {
     load()
-  }, [page, debouncedBusca, incluirInativos])
+  }, [page, debouncedBusca, incluirInativos, ordenarPor, ordem])
 
   useEffect(() => {
     coletarTodasPaginas<Redes.Rede>((o, l) => redes.list({ incluir_inativos: true, offset: o, limit: l })).then(
@@ -356,9 +362,30 @@ export function Empresas() {
             <table className="w-full min-w-[600px] text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
-                  <th className="whitespace-nowrap py-2.5 pl-2 pr-4">Empresa</th>
-                  <th className="whitespace-nowrap py-2.5 pr-4">CNPJ / CPF</th>
-                  <th className="min-w-[8rem] py-2.5 pr-4">Rede</th>
+                  <CabecalhoOrdenavel
+                    coluna="nome"
+                    rotulo="Empresa"
+                    ordenarPor={ordenarPor}
+                    ordem={ordem}
+                    aoOrdenar={aoOrdenarColuna}
+                    className="py-2.5 pl-2 pr-4"
+                  />
+                  <CabecalhoOrdenavel
+                    coluna="cnpj_cpf"
+                    rotulo="CNPJ / CPF"
+                    ordenarPor={ordenarPor}
+                    ordem={ordem}
+                    aoOrdenar={aoOrdenarColuna}
+                    className="py-2.5 pr-4"
+                  />
+                  <CabecalhoOrdenavel
+                    coluna="rede"
+                    rotulo="Rede"
+                    ordenarPor={ordenarPor}
+                    ordem={ordem}
+                    aoOrdenar={aoOrdenarColuna}
+                    className="min-w-[8rem] py-2.5 pr-4"
+                  />
                   <th className="w-px py-2.5 pr-2 text-right" aria-hidden />
                 </tr>
               </thead>

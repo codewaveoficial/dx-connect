@@ -12,5 +12,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Volume montado em desenvolvimento sobrescreve /app/app
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Produção: Gunicorn + Uvicorn workers (não usar runserver / uvicorn --reload aqui).
+CMD ["gunicorn", "-c", "gunicorn_conf.py", "app.main:app"]

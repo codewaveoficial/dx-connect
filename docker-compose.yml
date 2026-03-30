@@ -25,6 +25,15 @@ services:
       - ./backend/.env
     environment:
       DATABASE_URL: postgresql://dxconnect:dxconnect_secret@db:5432/dxconnect
+      ENVIRONMENT: development
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --reload
     ports:
       - "8000:8000"
     depends_on:

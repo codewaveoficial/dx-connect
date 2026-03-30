@@ -1,7 +1,10 @@
+from enum import Enum
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.core.ordenacao_lista import OrdemLista, expr_ordem
 from app.models import Setor
 from app.models.atendente import Atendente
 from app.schemas.setor import SetorCreate, SetorUpdate, SetorRead
@@ -15,12 +18,20 @@ _MAX_PAGE = 100
 _DEFAULT_PAGE = 20
 
 
+class OrdenarSetoresPor(str, Enum):
+    nome = "nome"
+    slug = "slug"
+    ativo = "ativo"
+
+
 @router.get("", response_model=ListaPaginada[SetorRead])
 def listar_setores(
     incluir_inativos: bool = Query(False, description="Incluir setores inativos"),
     busca: str | None = Query(None, description="Filtra por nome"),
     offset: int = Query(0, ge=0),
     limit: int = Query(_DEFAULT_PAGE, ge=1, le=_MAX_PAGE),
+    ordenar_por: OrdenarSetoresPor | None = Query(None),
+    ordem: OrdemLista = Query(OrdemLista.asc),
     db: Session = Depends(get_db),
     _: Atendente = Depends(obter_atendente_atual),
 ):
@@ -31,7 +42,15 @@ def listar_setores(
         term = f"%{busca.strip()}%"
         q = q.filter(Setor.nome.ilike(term))
     total = q.count()
-    items = q.order_by(Setor.nome).offset(offset).limit(limit).all()
+    if ordenar_por is None:
+        order_cols = [Setor.nome.asc(), Setor.id.asc()]
+    elif ordenar_por == OrdenarSetoresPor.nome:
+        order_cols = [expr_ordem(Setor.nome, ordem), expr_ordem(Setor.id, ordem)]
+    elif ordenar_por == OrdenarSetoresPor.slug:
+        order_cols = [expr_ordem(Setor.slug, ordem), expr_ordem(Setor.id, ordem)]
+    else:
+        order_cols = [expr_ordem(Setor.ativo, ordem), expr_ordem(Setor.id, ordem)]
+    items = q.order_by(*order_cols).offset(offset).limit(limit).all()
     return ListaPaginada(items=items, total=total)
 
 

@@ -176,5 +176,15 @@ npm run dev
 
 ## Produção
 
-- Build do frontend: `cd frontend && npm run build`
-- Servir o `dist/` com nginx ou similar e apontar a API para a URL do backend (variável `VITE_API_URL` no build).
+Checklist alinhado ao deploy (o que já está no código vs o que validar no servidor): [`docs/PRE_DEPLOY_CHECKLIST.md`](docs/PRE_DEPLOY_CHECKLIST.md).  
+Exemplos **Nginx** (HTTP, domínio → backend / estático): [`deploy/nginx/README.md`](deploy/nginx/README.md).
+
+**Backend (Docker, PostgreSQL externo)**  
+- Configure `backend/.env` (veja `backend/.env.example`): `DATABASE_URL`, `SECRET_KEY` (32+ caracteres), `CORS_ORIGINS` (origens HTTPS do frontend), `ENVIRONMENT=production`.  
+- Subir: `docker compose -f docker-compose.prod.yml up -d --build`  
+- Desenvolvimento local continua com `docker compose up` (API com `--reload` e banco `db` no compose).
+
+**Frontend**  
+- Crie `frontend/.env.production` com `VITE_API_URL=https://sua-api` (sem barra final) — veja `frontend/.env.example`.  
+- Build: `cd frontend && npm run build`  
+- Sirva a pasta `dist/` como site estático (painel Hostinger, nginx, etc.) com HTTPS.

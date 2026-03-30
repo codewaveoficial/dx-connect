@@ -1,4 +1,5 @@
 import logging
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -6,9 +7,26 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api import auth, redes, empresas, setores, atendentes, funcionarios_rede, status_ticket, tickets, dashboard, audit, tipo_negocio
-from app.database import Base, engine, get_db
+from app.database import Base, engine
 from app import models  # carrega todos os models para create_all
 from app.config import settings
+
+
+def _configure_logging() -> None:
+    level = getattr(logging, settings.LOG_LEVEL, logging.INFO)
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+        handlers=[logging.StreamHandler(sys.stdout)],
+        force=True,
+    )
+    for name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
+        logging.getLogger(name).setLevel(level)
+
+
+_configure_logging()
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -72,19 +90,21 @@ async def lifespan(app: FastAPI):
     yield
 
 
-logger = logging.getLogger(__name__)
-
+_docs_kw = {}
+if settings.is_production:
+    _docs_kw = {"docs_url": None, "redoc_url": None, "openapi_url": None}
 
 app = FastAPI(
     title="DX Connect API",
     description="API do sistema de tickets e suporte",
     version="0.1.0",
     lifespan=lifespan,
+    **_docs_kw,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=settings.cors_origins_list(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

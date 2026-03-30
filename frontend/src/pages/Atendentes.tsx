@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { CabecalhoOrdenavel } from '../components/ui/CabecalhoOrdenavel'
+import { useOrdenacaoLista } from '../hooks/useOrdenacaoLista'
 import { atendentes, setores, type Atendentes, type Setores } from '../api/client'
 import { coletarTodasPaginas } from '../api/collectPages'
 import { Card } from '../components/ui/Card'
@@ -11,7 +13,12 @@ import { Switch } from '../components/ui/Switch'
 import { CheckboxField } from '../components/ui/CheckboxField'
 import { Select } from '../components/ui/Select'
 
+type ColunaAtendente = 'nome' | 'email' | 'role'
+
+const roleLabel: Record<string, string> = { admin: 'Administrador', atendente: 'Atendente' }
+
 export function Atendentes() {
+  const { ordenarPor, ordem, aoOrdenarColuna, sortParams } = useOrdenacaoLista<ColunaAtendente>()
   const [list, setList] = useState<Atendentes.Atendente[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -39,7 +46,7 @@ export function Atendentes() {
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedBusca, incluirInativos])
+  }, [debouncedBusca, incluirInativos, ordenarPor, ordem])
 
   function load() {
     setLoading(true)
@@ -48,6 +55,7 @@ export function Atendentes() {
       .list({
         incluir_inativos: incluirInativos,
         busca: debouncedBusca || undefined,
+        ...sortParams,
         offset: (page - 1) * PAGE_SIZE_PADRAO,
         limit: PAGE_SIZE_PADRAO,
       })
@@ -65,7 +73,7 @@ export function Atendentes() {
 
   useEffect(() => {
     load()
-  }, [page, debouncedBusca, incluirInativos])
+  }, [page, debouncedBusca, incluirInativos, ordenarPor, ordem])
 
   useEffect(() => {
     coletarTodasPaginas<Setores.Setor>((o, l) =>
@@ -163,28 +171,58 @@ export function Atendentes() {
         ) : list.length === 0 ? (
           <p className="text-slate-500 dark:text-slate-400">Nenhum atendente encontrado.</p>
         ) : (
-          <ul className="divide-y divide-slate-200 dark:divide-slate-700">
-            {list.map((a) => (
-              <li
-                key={a.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => openEdit(a)}
-                onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openEdit(a); } }}
-                className="flex cursor-pointer items-center justify-between rounded-lg py-3 px-2 -mx-2 transition-colors duration-150 hover:bg-slate-50 dark:bg-slate-800/40 dark:hover:bg-slate-800/60/80 dark:hover:bg-slate-800/50 focus:outline-none focus:bg-slate-50 dark:bg-slate-800/40 dark:focus:bg-slate-800/40/80"
-              >
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <span className={`font-medium ${a.ativo ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>{a.nome}</span>
-                  {!a.ativo && <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600 dark:text-slate-400">Inativo</span>}
-                  <span className="text-slate-500 dark:text-slate-400">{a.email}</span>
-                  <span className="text-xs text-slate-400">({a.role})</span>
-                </div>
-                <div className="shrink-0" onClick={(ev) => ev.stopPropagation()}>
-                  <Button variant="ghost" onClick={() => openEdit(a)} aria-label="Editar"><IconPencil /></Button>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-800/40">
+                  <CabecalhoOrdenavel coluna="nome" rotulo="Nome" ordenarPor={ordenarPor} ordem={ordem} aoOrdenar={aoOrdenarColuna} />
+                  <CabecalhoOrdenavel coluna="email" rotulo="E-mail" ordenarPor={ordenarPor} ordem={ordem} aoOrdenar={aoOrdenarColuna} />
+                  <CabecalhoOrdenavel coluna="role" rotulo="Perfil" ordenarPor={ordenarPor} ordem={ordem} aoOrdenar={aoOrdenarColuna} />
+                  <th className="w-px px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500 sm:px-6 dark:text-slate-400">
+                    <span className="sr-only">Ações</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {list.map((a) => (
+                  <tr
+                    key={a.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openEdit(a)}
+                    onKeyDown={(ev) => {
+                      if (ev.key === 'Enter' || ev.key === ' ') {
+                        ev.preventDefault()
+                        openEdit(a)
+                      }
+                    }}
+                    className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 focus:outline-none focus-visible:bg-slate-100/80 dark:focus-visible:bg-slate-800/60"
+                  >
+                    <td className="px-4 py-3.5 sm:px-6">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`font-medium ${a.ativo ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>{a.nome}</span>
+                        {!a.ativo && (
+                          <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600 dark:text-slate-400">Inativo</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="max-w-[14rem] truncate px-4 py-3.5 text-slate-600 sm:px-6 dark:text-slate-400" title={a.email}>
+                      {a.email}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3.5 text-slate-600 sm:px-6 dark:text-slate-400">
+                      {roleLabel[a.role] ?? a.role}
+                    </td>
+                    <td className="px-4 py-3.5 text-right sm:px-6" onClick={(ev) => ev.stopPropagation()}>
+                      <Button variant="ghost" onClick={() => openEdit(a)} aria-label="Editar">
+                        <IconPencil />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
         )}
         </Card>
       )}

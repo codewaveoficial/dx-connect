@@ -1,0 +1,63 @@
+# Checklist pré-deploy (antes de contratar VPS)
+
+Objetivo: o projeto ser **implantável** de forma repetível, não só na sua máquina.
+
+Legenda: **OK** atendido no repositório | **Você** validação manual no servidor/domínio | **Parcial** requer atenção.
+
+## Código e configuração
+
+| Item | Status |
+|------|--------|
+| Backend com modo seguro (equivalente a `DEBUG=False`) | **OK** — `DEBUG=false` no `.env`; em `ENVIRONMENT=production` o app **recusa** subir com `DEBUG=true`. |
+| Backend com servidor de produção (Gunicorn) | **OK** — imagem Docker usa `gunicorn` + `uvicorn.workers.UvicornWorker` (`gunicorn_conf.py`). Dev local continua com `uvicorn --reload` no `docker-compose.yml`. |
+| Variáveis sensíveis fora do código | **OK** — `.env` / ambiente; `.env` no `.gitignore`. |
+| Sem URL da API hardcoded no app (produção) | **OK** — frontend: `VITE_API_URL`; CORS: `CORS_ORIGINS`. Referências a `localhost` só em defaults de dev e no proxy do `vite.config.ts` (modo dev). |
+| Frontend consome API via variável de ambiente | **OK** — build exige `VITE_API_URL`. |
+
+**Nota:** Gunicorn **não roda no Windows** nativamente; valide com `docker build` / container Linux ou no próprio VPS.
+
+## Banco de dados
+
+| Item | Status |
+|------|--------|
+| PostgreSQL em todos os ambientes | **OK** — não há SQLite no caminho principal. |
+| Migrations versionadas (Alembic) | **Parcial** — existe pasta `alembic/versions/`, mas o startup ainda usa `create_all` + scripts ad hoc; ideal evoluir para `alembic upgrade head` como fonte única do schema em produção. |
+| Subir banco do zero e rodar app | **Você** — primeiro deploy: criar DB/usuário no provedor; API cria tabelas no startup. |
+| Persistência após reinício | **Você** — dados ficam no PostgreSQL do provedor; reiniciar só o container não apaga o DB. |
+
+## Frontend
+
+| Item | Status |
+|------|--------|
+| `npm run build` sem erro | **OK** — com `VITE_API_URL` definida (ex.: `.env.production`). |
+| Rodar com build estático / preview | **Você** — `npm run preview` ou servir `dist/` com nginx/painel. |
+| Sem dependência de `npm run dev` em produção | **OK** — produção é só arquivos estáticos + API. |
+
+## Docker (backend)
+
+| Item | Status |
+|------|--------|
+| Container sobe sem passo manual extra | **OK** — `docker compose -f docker-compose.prod.yml up -d --build` + `.env` no servidor. |
+| Não usa runserver / reload em produção | **OK** — `Dockerfile` = Gunicorn; compose de **dev** sobrescreve com `--reload`. |
+| Variáveis injetadas corretamente | **OK** — `env_file` + `environment` onde necessário. |
+| Simular produção localmente | **OK** — `docker-compose.prod.yml` apontando `DATABASE_URL` para um Postgres acessível (ex.: IP local ou túnel). |
+
+## Integração
+
+| Item | Status |
+|------|--------|
+| Frontend fala com API fora do localhost | **Você** — definir `VITE_API_URL` pública e publicar o `dist/`. |
+| CORS correto | **Você** — `CORS_ORIGINS` com a origem HTTPS exata do site (com/sem `www`). |
+| Login + fluxo principal | **Você** — testar em HTTPS após deploy. |
+
+## Segurança mínima
+
+| Item | Status |
+|------|--------|
+| `SECRET_KEY` fora do repositório | **OK** — só no `.env` do servidor / CI. |
+| `DEBUG=False` validado em produção | **OK** — `DEBUG=true` + `ENVIRONMENT=production` falha na validação. |
+| Rotas sensíveis sem controle | **Parcial** — `/docs` e OpenAPI **desligados** quando `ENVIRONMENT=production`; demais rotas seguem auth nas próprias rotas. |
+
+---
+
+Antes de contratar o VPS, o mínimo **a fazer na sua máquina**: build do frontend com `VITE_API_URL`, `docker build` do backend (Linux), e um teste de login contra uma API já validada (pode ser staging).

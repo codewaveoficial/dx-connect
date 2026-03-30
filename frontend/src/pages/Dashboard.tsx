@@ -1,11 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { CabecalhoOrdenavel } from '../components/ui/CabecalhoOrdenavel'
+import { useOrdenacaoLista } from '../hooks/useOrdenacaoLista'
 import { Link } from 'react-router-dom'
 import { dashboard } from '../api/client'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { IconEye } from '../components/ui/IconEye'
 
+type ColunaUltimos = 'protocolo' | 'empresa' | 'assunto' | 'status'
+
 export function Dashboard() {
+  const { ordenarPor, ordem, aoOrdenarColuna } = useOrdenacaoLista<ColunaUltimos>()
   const [data, setData] = useState<Awaited<ReturnType<typeof dashboard.get>> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -37,6 +42,23 @@ export function Dashboard() {
   }
 
   const { resumo, ultimos_tickets } = data
+
+  const ultimosOrdenados = useMemo(() => {
+    if (!ordenarPor) return ultimos_tickets
+    const m = ordem === 'asc' ? 1 : -1
+    const cmp = (a: string, b: string) => m * a.localeCompare(b, 'pt-BR')
+    const rows = [...ultimos_tickets]
+    rows.sort((x, y) => {
+      let r = 0
+      if (ordenarPor === 'protocolo') r = cmp(x.protocolo, y.protocolo)
+      else if (ordenarPor === 'empresa')
+        r = cmp(x.empresa_nome ?? String(x.empresa_id ?? ''), y.empresa_nome ?? String(y.empresa_id ?? ''))
+      else if (ordenarPor === 'assunto') r = cmp(x.assunto, y.assunto)
+      else r = cmp(x.status_nome ?? String(x.status_id ?? ''), y.status_nome ?? String(y.status_id ?? ''))
+      return r
+    })
+    return rows
+  }, [ultimos_tickets, ordenarPor, ordem])
 
   return (
     <div className="space-y-6">
@@ -83,15 +105,43 @@ export function Dashboard() {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-700/80 text-slate-600 dark:text-slate-400">
-                  <th className="pb-2 pr-4 font-medium">Protocolo</th>
-                  <th className="pb-2 pr-4 font-medium">Empresa</th>
-                  <th className="pb-2 pr-4 font-medium">Assunto</th>
-                  <th className="pb-2 pr-4 font-medium">Status</th>
+                  <CabecalhoOrdenavel
+                    coluna="protocolo"
+                    rotulo="Protocolo"
+                    ordenarPor={ordenarPor}
+                    ordem={ordem}
+                    aoOrdenar={aoOrdenarColuna}
+                    className="pb-2 pr-4 font-medium normal-case"
+                  />
+                  <CabecalhoOrdenavel
+                    coluna="empresa"
+                    rotulo="Empresa"
+                    ordenarPor={ordenarPor}
+                    ordem={ordem}
+                    aoOrdenar={aoOrdenarColuna}
+                    className="pb-2 pr-4 font-medium normal-case"
+                  />
+                  <CabecalhoOrdenavel
+                    coluna="assunto"
+                    rotulo="Assunto"
+                    ordenarPor={ordenarPor}
+                    ordem={ordem}
+                    aoOrdenar={aoOrdenarColuna}
+                    className="pb-2 pr-4 font-medium normal-case"
+                  />
+                  <CabecalhoOrdenavel
+                    coluna="status"
+                    rotulo="Status"
+                    ordenarPor={ordenarPor}
+                    ordem={ordem}
+                    aoOrdenar={aoOrdenarColuna}
+                    className="pb-2 pr-4 font-medium normal-case"
+                  />
                   <th className="pb-2 font-medium">Ações</th>
                 </tr>
               </thead>
               <tbody>
-                {ultimos_tickets.map((t) => (
+                {ultimosOrdenados.map((t) => (
                   <tr key={t.id} className="border-b border-slate-100 dark:border-slate-700/60">
                     <td className="py-3 pr-4 font-mono text-slate-800 dark:text-slate-100">{t.protocolo}</td>
                     <td className="py-3 pr-4">{t.empresa_nome ?? t.empresa_id}</td>

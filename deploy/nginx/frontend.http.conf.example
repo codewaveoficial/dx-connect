@@ -1,0 +1,24 @@
+# Frontend estático (pasta dist/ do npm run build).
+# Ajuste server_name e root para o caminho real no VPS (ex.: /var/www/dx-connect/dist).
+#
+# O VITE_API_URL no build deve ser a URL pública da API (ex.: http://api.seudominio.com até ativar HTTPS).
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name app.seudominio.com;
+
+    root /var/www/dx-connect/dist;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location = /index.html {
+        add_header Cache-Control "no-cache";
+    }
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+}

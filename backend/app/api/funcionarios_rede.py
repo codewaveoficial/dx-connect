@@ -1,8 +1,11 @@
+from enum import Enum
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.core.ordenacao_lista import OrdemLista, expr_ordem
 from app.models import FuncionarioRede, FuncionarioRedeEmpresa, Ticket, Empresa
 from app.models.atendente import Atendente
 from app.schemas.funcionario_rede import FuncionarioRedeCreate, FuncionarioRedeUpdate, FuncionarioRedeRead
@@ -14,6 +17,14 @@ router = APIRouter(prefix="/funcionarios-rede", tags=["funcionarios-rede"])
 
 _MAX_PAGE = 100
 _DEFAULT_PAGE = 20
+
+
+class OrdenarFuncionariosPor(str, Enum):
+    nome = "nome"
+    email = "email"
+    tipo = "tipo"
+    ativo = "ativo"
+    rede_id = "rede_id"
 
 
 def _para_read(f: FuncionarioRede) -> FuncionarioRedeRead:
@@ -41,6 +52,8 @@ def listar(
     busca: str | None = Query(None, description="Filtra por nome ou e-mail"),
     offset: int = Query(0, ge=0),
     limit: int = Query(_DEFAULT_PAGE, ge=1, le=_MAX_PAGE),
+    ordenar_por: OrdenarFuncionariosPor | None = Query(None),
+    ordem: OrdemLista = Query(OrdemLista.asc),
     db: Session = Depends(get_db),
     _: Atendente = Depends(exigir_admin),
 ):
@@ -64,7 +77,19 @@ def listar(
         term = f"%{busca.strip()}%"
         q = q.filter(or_(FuncionarioRede.nome.ilike(term), FuncionarioRede.email.ilike(term)))
     total = q.count()
-    rows = q.order_by(FuncionarioRede.nome).offset(offset).limit(limit).all()
+    if ordenar_por is None:
+        order_cols = [FuncionarioRede.nome.asc(), FuncionarioRede.id.asc()]
+    elif ordenar_por == OrdenarFuncionariosPor.nome:
+        order_cols = [expr_ordem(FuncionarioRede.nome, ordem), expr_ordem(FuncionarioRede.id, ordem)]
+    elif ordenar_por == OrdenarFuncionariosPor.email:
+        order_cols = [expr_ordem(FuncionarioRede.email, ordem), expr_ordem(FuncionarioRede.id, ordem)]
+    elif ordenar_por == OrdenarFuncionariosPor.tipo:
+        order_cols = [expr_ordem(FuncionarioRede.tipo, ordem), expr_ordem(FuncionarioRede.id, ordem)]
+    elif ordenar_por == OrdenarFuncionariosPor.ativo:
+        order_cols = [expr_ordem(FuncionarioRede.ativo, ordem), expr_ordem(FuncionarioRede.id, ordem)]
+    else:
+        order_cols = [expr_ordem(FuncionarioRede.rede_id, ordem), expr_ordem(FuncionarioRede.id, ordem)]
+    rows = q.order_by(*order_cols).offset(offset).limit(limit).all()
     return ListaPaginada(items=[_para_read(f) for f in rows], total=total)
 
 

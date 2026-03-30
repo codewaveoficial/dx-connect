@@ -1,8 +1,11 @@
+from enum import Enum
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
+from app.core.ordenacao_lista import OrdemLista, expr_ordem
 from app.models import Atendente, Setor
 from app.schemas.atendente import AtendenteCreate, AtendenteRead, AtendenteUpdate
 from app.schemas.lista_paginada import ListaPaginada
@@ -15,6 +18,13 @@ router = APIRouter(prefix="/atendentes", tags=["atendentes"])
 
 _MAX_PAGE = 100
 _DEFAULT_PAGE = 20
+
+
+class OrdenarAtendentesPor(str, Enum):
+    nome = "nome"
+    email = "email"
+    role = "role"
+    ativo = "ativo"
 
 
 def _atendente_para_read(atendente: Atendente) -> AtendenteRead:
@@ -36,6 +46,8 @@ def listar_atendentes(
     busca: str | None = Query(None, description="Filtra por nome ou e-mail"),
     offset: int = Query(0, ge=0),
     limit: int = Query(_DEFAULT_PAGE, ge=1, le=_MAX_PAGE),
+    ordenar_por: OrdenarAtendentesPor | None = Query(None),
+    ordem: OrdemLista = Query(OrdemLista.asc),
     db: Session = Depends(get_db),
     _: Atendente = Depends(exigir_admin),
 ):
@@ -46,9 +58,19 @@ def listar_atendentes(
         term = f"%{busca.strip()}%"
         q = q.filter(or_(Atendente.nome.ilike(term), Atendente.email.ilike(term)))
     total = q.count()
+    if ordenar_por is None:
+        order_cols = [Atendente.nome.asc(), Atendente.id.asc()]
+    elif ordenar_por == OrdenarAtendentesPor.nome:
+        order_cols = [expr_ordem(Atendente.nome, ordem), expr_ordem(Atendente.id, ordem)]
+    elif ordenar_por == OrdenarAtendentesPor.email:
+        order_cols = [expr_ordem(Atendente.email, ordem), expr_ordem(Atendente.id, ordem)]
+    elif ordenar_por == OrdenarAtendentesPor.role:
+        order_cols = [expr_ordem(Atendente.role, ordem), expr_ordem(Atendente.id, ordem)]
+    else:
+        order_cols = [expr_ordem(Atendente.ativo, ordem), expr_ordem(Atendente.id, ordem)]
     rows = (
         q.options(joinedload(Atendente.setores))
-        .order_by(Atendente.nome)
+        .order_by(*order_cols)
         .offset(offset)
         .limit(limit)
         .all()

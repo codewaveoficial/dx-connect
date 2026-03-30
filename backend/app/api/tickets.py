@@ -1,11 +1,12 @@
 from datetime import datetime, timezone
+from enum import Enum
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_
+from sqlalchemy import or_, asc, desc, nullslast
 
 from app.database import get_db
-from app.models import Ticket, TicketHistorico, TicketMensagem, Empresa, Setor, StatusTicket, Atendente
+from app.models import Ticket, TicketHistorico, TicketMensagem, Empresa, Setor, StatusTicket, Atendente, Rede
 from app.schemas.ticket import (
     TicketCreate,
     TicketUpdate,
@@ -16,12 +17,23 @@ from app.schemas.ticket import (
 )
 from app.schemas.lista_paginada import ListaPaginada
 from app.core.auth import obter_atendente_atual
+from app.core.ordenacao_lista import OrdemLista, expr_ordem
 from app.core.setor_scope import ids_setores_visiveis_atendente, atendente_atende_algum_id_setor
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
 _MAX_PAGE = 100
 _DEFAULT_PAGE = 20
+
+
+class OrdenarTicketsPor(str, Enum):
+    protocolo = "protocolo"
+    rede = "rede"
+    empresa = "empresa"
+    setor = "setor"
+    assunto = "assunto"
+    status = "status"
+    responsavel = "responsavel"
 
 
 def _gerar_protocolo(db: Session) -> str:
@@ -87,6 +99,14 @@ def listar(
     ),
     offset: int = Query(0, ge=0),
     limit: int = Query(_DEFAULT_PAGE, ge=1, le=_MAX_PAGE),
+    ordenar_por: OrdenarTicketsPor | None = Query(
+        None,
+        description="Coluna para ordenação (default: data de criação, mais recentes primeiro)",
+    ),
+    ordem: OrdemLista = Query(
+        OrdemLista.asc,
+        description="asc = A→Z / menor primeiro; desc = Z→A / maior primeiro",
+    ),
     db: Session = Depends(get_db),
     atendente: Atendente = Depends(obter_atendente_atual),
 ):
@@ -123,6 +143,32 @@ def listar(
             )
         )
     total = q.count()
+
+    if ordenar_por is None:
+        order_cols = [Ticket.created_at.desc(), Ticket.id.desc()]
+    else:
+        if ordenar_por == OrdenarTicketsPor.responsavel:
+            q = q.outerjoin(Ticket.atendente)
+        elif ordenar_por == OrdenarTicketsPor.rede:
+            q = q.join(Empresa.rede)
+
+        if ordenar_por == OrdenarTicketsPor.protocolo:
+            primary = expr_ordem(Ticket.protocolo, ordem)
+        elif ordenar_por == OrdenarTicketsPor.rede:
+            primary = expr_ordem(Rede.nome, ordem)
+        elif ordenar_por == OrdenarTicketsPor.empresa:
+            primary = expr_ordem(Empresa.nome, ordem)
+        elif ordenar_por == OrdenarTicketsPor.setor:
+            primary = expr_ordem(Setor.nome, ordem)
+        elif ordenar_por == OrdenarTicketsPor.assunto:
+            primary = expr_ordem(Ticket.assunto, ordem)
+        elif ordenar_por == OrdenarTicketsPor.status:
+            primary = expr_ordem(StatusTicket.nome, ordem)
+        else:
+            primary = nullslast(expr_ordem(Atendente.nome, ordem))
+        tie = expr_ordem(Ticket.id, ordem)
+        order_cols = [primary, tie]
+
     rows = (
         q.options(
             joinedload(Ticket.empresa).joinedload(Empresa.rede),
@@ -130,7 +176,7 @@ def listar(
             joinedload(Ticket.status),
             joinedload(Ticket.atendente),
         )
-        .order_by(Ticket.created_at.desc())
+        .order_by(*order_cols)
         .offset(offset)
         .limit(limit)
         .all()
