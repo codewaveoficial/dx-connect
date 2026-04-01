@@ -13,6 +13,8 @@ import { maskCnpjCpf, digitsOnly, isCnpj } from '../utils/maskCnpjCpf'
 import { SelectComPesquisa } from '../components/ui/SelectComPesquisa'
 import { Select } from '../components/ui/Select'
 import { BarraBuscaPaginacao, PAGE_SIZE_PADRAO } from '../components/ui/BarraBuscaPaginacao'
+import { CabecalhoOrdenavel } from '../components/ui/CabecalhoOrdenavel'
+import { useOrdenacaoLista } from '../hooks/useOrdenacaoLista'
 import { Switch } from '../components/ui/Switch'
 import { CheckboxField } from '../components/ui/CheckboxField'
 
@@ -21,12 +23,25 @@ type TipoFuncionario = 'socio' | 'supervisor' | 'colaborador'
 const tipoLabel: Record<string, string> = { socio: 'Sócio', supervisor: 'Supervisor', colaborador: 'Colaborador' }
 
 type FuncionarioListaItem = Redes.FuncionarioComVinculo
+type ColunaEmpresaRede = 'nome' | 'cnpj_cpf'
+type ColunaFuncRede = 'nome' | 'email' | 'tipo'
 
 export function RedeDetalhe() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const toast = useToast()
   const redeId = id ? parseInt(id, 10) : NaN
+  const {
+    ordenarPor: ordemColEmpresa,
+    ordem: dirEmpresa,
+    aoOrdenarColuna: aoOrdEmpresa,
+  } = useOrdenacaoLista<ColunaEmpresaRede>()
+  const {
+    ordenarPor: ordemColFunc,
+    ordem: dirFunc,
+    aoOrdenarColuna: aoOrdFunc,
+    sortParams: sortFuncParams,
+  } = useOrdenacaoLista<ColunaFuncRede>()
 
   const [rede, setRede] = useState<Awaited<ReturnType<typeof redes.get>> | null>(null)
   const [empresasList, setEmpresasList] = useState<Empresas.Empresa[]>([])
@@ -83,17 +98,27 @@ export function RedeDetalhe() {
 
   const empresasFiltradas = useMemo(() => {
     const base = incluirInativos ? empresasList : empresasList.filter((e) => e.ativo)
-    if (!debouncedBuscaEmpresas) return base
-    const q = debouncedBuscaEmpresas.toLowerCase()
-    const digits = debouncedBuscaEmpresas.replace(/\D/g, '')
-    return base.filter(
-      (e) =>
-        e.nome.toLowerCase().includes(q) ||
-        (e.razao_social && e.razao_social.toLowerCase().includes(q)) ||
-        (e.nome_fantasia && e.nome_fantasia.toLowerCase().includes(q)) ||
-        (digits.length > 0 && e.cnpj_cpf && e.cnpj_cpf.replace(/\D/g, '').includes(digits)),
-    )
-  }, [empresasList, incluirInativos, debouncedBuscaEmpresas])
+    let filtered = base
+    if (debouncedBuscaEmpresas) {
+      const q = debouncedBuscaEmpresas.toLowerCase()
+      const digits = debouncedBuscaEmpresas.replace(/\D/g, '')
+      filtered = base.filter(
+        (e) =>
+          e.nome.toLowerCase().includes(q) ||
+          (e.razao_social && e.razao_social.toLowerCase().includes(q)) ||
+          (e.nome_fantasia && e.nome_fantasia.toLowerCase().includes(q)) ||
+          (digits.length > 0 && e.cnpj_cpf && e.cnpj_cpf.replace(/\D/g, '').includes(digits)),
+      )
+    }
+    if (!ordemColEmpresa) return filtered
+    const m = dirEmpresa === 'asc' ? 1 : -1
+    return [...filtered].sort((a, b) => {
+      if (ordemColEmpresa === 'nome') return m * a.nome.localeCompare(b.nome, 'pt-BR')
+      const da = (a.cnpj_cpf || '').replace(/\D/g, '')
+      const db = (b.cnpj_cpf || '').replace(/\D/g, '')
+      return m * da.localeCompare(db, 'pt-BR')
+    })
+  }, [empresasList, incluirInativos, debouncedBuscaEmpresas, ordemColEmpresa, dirEmpresa])
 
   const empresasPagina = useMemo(() => {
     const start = (pageEmpresas - 1) * PAGE_SIZE_PADRAO
@@ -116,11 +141,11 @@ export function RedeDetalhe() {
 
   useEffect(() => {
     setPageFuncionarios(1)
-  }, [debouncedBuscaFuncionarios, incluirInativos])
+  }, [debouncedBuscaFuncionarios, incluirInativos, ordemColFunc, dirFunc])
 
   useEffect(() => {
     setPageEmpresas(1)
-  }, [debouncedBuscaEmpresas, incluirInativos])
+  }, [debouncedBuscaEmpresas, incluirInativos, ordemColEmpresa, dirEmpresa])
 
   function loadFuncionarios(override?: { busca?: string; page?: number }) {
     if (!redeId || isNaN(redeId)) return
@@ -131,6 +156,7 @@ export function RedeDetalhe() {
       .getFuncionarios(redeId, {
         incluir_inativos: incluirInativos,
         busca: buscaEff.trim() || undefined,
+        ...sortFuncParams,
         offset: (pageEff - 1) * PAGE_SIZE_PADRAO,
         limit: PAGE_SIZE_PADRAO,
       })
@@ -194,7 +220,7 @@ export function RedeDetalhe() {
 
   useEffect(() => {
     loadFuncionarios()
-  }, [redeId, incluirInativos, pageFuncionarios, debouncedBuscaFuncionarios])
+  }, [redeId, incluirInativos, pageFuncionarios, debouncedBuscaFuncionarios, ordemColFunc, dirFunc])
 
   useEffect(() => {
     if (id && !isNaN(redeId)) return
@@ -771,31 +797,70 @@ export function RedeDetalhe() {
           ) : empresasFiltradas.length === 0 ? (
             <p className="text-slate-500">Nenhuma empresa nesta rede.</p>
           ) : (
-            <ul className="divide-y divide-slate-200">
-              {empresasPagina.map((e) => (
-                <li
-                  key={e.id}
-                  role="button"
-                  tabIndex={0}
-                onClick={() => openViewEmpresa(e)}
-                onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openViewEmpresa(e); } }}
-                  className="flex cursor-pointer items-center justify-between rounded-lg py-3 px-2 -mx-2 transition-colors duration-150 hover:bg-slate-50/80 focus:outline-none focus:bg-slate-50/80"
-                >
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className={`truncate font-medium ${e.ativo ? 'text-slate-800' : 'text-slate-400'}`}>{e.nome}</span>
-                    {!e.ativo && <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600">Inativo</span>}
-                  </div>
-                  <div className="flex shrink-0 gap-1.5" onClick={(ev) => ev.stopPropagation()}>
-                    <Button variant="ghost" onClick={() => openEditEmpresa(e)} aria-label="Editar empresa">
-                      <IconPencil ariaHidden={false} />
-                    </Button>
-                    <Button variant="ghost" onClick={() => handleDeleteEmpresa(e.id)} aria-label="Excluir empresa">
-                      <IconTrash ariaHidden={false} />
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50/60 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
+                    <CabecalhoOrdenavel
+                      coluna="nome"
+                      rotulo="Empresa"
+                      ordenarPor={ordemColEmpresa}
+                      ordem={dirEmpresa}
+                      aoOrdenar={aoOrdEmpresa}
+                    />
+                    <CabecalhoOrdenavel
+                      coluna="cnpj_cpf"
+                      rotulo="CNPJ / CPF"
+                      ordenarPor={ordemColEmpresa}
+                      ordem={dirEmpresa}
+                      aoOrdenar={aoOrdEmpresa}
+                    />
+                    <th className="w-px px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500 sm:px-6 dark:text-slate-400">
+                      <span className="sr-only">Ações</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {empresasPagina.map((e) => (
+                    <tr
+                      key={e.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => openViewEmpresa(e)}
+                      onKeyDown={(ev) => {
+                        if (ev.key === 'Enter' || ev.key === ' ') {
+                          ev.preventDefault()
+                          openViewEmpresa(e)
+                        }
+                      }}
+                      className="cursor-pointer transition-colors hover:bg-slate-50/80 focus:outline-none focus-visible:bg-slate-100/80 dark:hover:bg-slate-800/50"
+                    >
+                      <td className="px-4 py-3.5 sm:px-6">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`truncate font-medium ${e.ativo ? 'text-slate-800' : 'text-slate-400'}`}>{e.nome}</span>
+                          {!e.ativo && (
+                            <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600">Inativo</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 font-mono text-xs text-slate-600 tabular-nums sm:px-6 dark:text-slate-400">
+                        {e.cnpj_cpf ? maskCnpjCpf(e.cnpj_cpf) : '—'}
+                      </td>
+                      <td className="px-4 py-3.5 text-right sm:px-6" onClick={(ev) => ev.stopPropagation()}>
+                        <div className="inline-flex gap-1.5">
+                          <Button variant="ghost" onClick={() => openEditEmpresa(e)} aria-label="Editar empresa">
+                            <IconPencil ariaHidden={false} />
+                          </Button>
+                          <Button variant="ghost" onClick={() => handleDeleteEmpresa(e.id)} aria-label="Excluir empresa">
+                            <IconTrash ariaHidden={false} />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </Card>
       )}
@@ -908,38 +973,77 @@ export function RedeDetalhe() {
           ) : funcionariosList.length === 0 ? (
             <p className="text-slate-500">Nenhum funcionário vinculado a esta rede.</p>
           ) : (
-            <ul className="divide-y divide-slate-200">
-              {funcionariosList.map((f) => (
-                <li
-                  key={f.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => verFuncionarioDetalhe(f)}
-                  onKeyDown={(ev) => {
-                    if (ev.key === 'Enter' || ev.key === ' ') {
-                      ev.preventDefault()
-                      verFuncionarioDetalhe(f)
-                    }
-                  }}
-                  className="flex cursor-pointer items-center justify-between rounded-lg py-3 px-2 -mx-2 transition-colors duration-150 hover:bg-slate-50/80 focus:outline-none focus:bg-slate-50/80"
-                >
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="font-medium text-slate-800">{f.nome}</span>
-                    <span className="text-slate-500">{f.email}</span>
-                    <span className="text-xs text-slate-400">({tipoLabel[f.tipo] ?? f.tipo})</span>
-                    <span className="text-slate-500">— {f.vinculado_a}</span>
-                  </div>
-                  <div className="flex shrink-0 gap-1.5" onClick={(ev) => ev.stopPropagation()}>
-                    <Button variant="ghost" onClick={() => openEditFuncionario(f)} aria-label="Editar funcionário">
-                      <IconPencil ariaHidden={false} />
-                    </Button>
-                    <Button variant="ghost" onClick={() => handleDeleteFuncionario(f.id)} aria-label="Excluir funcionário">
-                      <IconTrash ariaHidden={false} />
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[860px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50/60 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
+                    <CabecalhoOrdenavel
+                      coluna="nome"
+                      rotulo="Nome"
+                      ordenarPor={ordemColFunc}
+                      ordem={dirFunc}
+                      aoOrdenar={aoOrdFunc}
+                    />
+                    <CabecalhoOrdenavel
+                      coluna="email"
+                      rotulo="E-mail"
+                      ordenarPor={ordemColFunc}
+                      ordem={dirFunc}
+                      aoOrdenar={aoOrdFunc}
+                    />
+                    <CabecalhoOrdenavel
+                      coluna="tipo"
+                      rotulo="Tipo"
+                      ordenarPor={ordemColFunc}
+                      ordem={dirFunc}
+                      aoOrdenar={aoOrdFunc}
+                    />
+                    <th className="px-4 py-3 text-xs font-semibold uppercase text-slate-500 sm:px-6 dark:text-slate-400">Vínculo</th>
+                    <th className="w-px px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500 sm:px-6 dark:text-slate-400">
+                      <span className="sr-only">Ações</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {funcionariosList.map((f) => (
+                    <tr
+                      key={f.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => verFuncionarioDetalhe(f)}
+                      onKeyDown={(ev) => {
+                        if (ev.key === 'Enter' || ev.key === ' ') {
+                          ev.preventDefault()
+                          verFuncionarioDetalhe(f)
+                        }
+                      }}
+                      className="cursor-pointer transition-colors hover:bg-slate-50/80 focus:outline-none focus-visible:bg-slate-100/80 dark:hover:bg-slate-800/50"
+                    >
+                      <td className="px-4 py-3.5 font-medium text-slate-800 sm:px-6 dark:text-slate-100">{f.nome}</td>
+                      <td className="max-w-[12rem] truncate px-4 py-3.5 text-slate-600 sm:px-6 dark:text-slate-400" title={f.email}>
+                        {f.email}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 text-slate-600 sm:px-6 dark:text-slate-400">
+                        {tipoLabel[f.tipo] ?? f.tipo}
+                      </td>
+                      <td className="max-w-[14rem] truncate px-4 py-3.5 text-slate-600 sm:px-6 dark:text-slate-400" title={f.vinculado_a}>
+                        {f.vinculado_a}
+                      </td>
+                      <td className="px-4 py-3.5 text-right sm:px-6" onClick={(ev) => ev.stopPropagation()}>
+                        <div className="inline-flex gap-1.5">
+                          <Button variant="ghost" onClick={() => openEditFuncionario(f)} aria-label="Editar funcionário">
+                            <IconPencil ariaHidden={false} />
+                          </Button>
+                          <Button variant="ghost" onClick={() => handleDeleteFuncionario(f.id)} aria-label="Excluir funcionário">
+                            <IconTrash ariaHidden={false} />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </Card>
       )}

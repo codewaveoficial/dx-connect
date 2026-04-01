@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Sidebar } from './Sidebar'
+import { ThemeToggle } from './ThemeToggle'
 
 const menuIcon = (
   <svg className="size-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
@@ -15,7 +16,7 @@ export function Layout() {
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/90 dark:from-slate-950 dark:to-slate-900/95">
       <Sidebar
         expanded={sidebarExpanded}
         mobileOpen={sidebarMobileOpen}
@@ -33,7 +34,7 @@ export function Layout() {
         }`}
       >
           {/* Top bar: mobile-first, área de toque generosa */}
-          <header className="sticky top-0 z-30 flex h-14 min-h-[56px] items-center gap-3 border-b border-slate-200 bg-white px-4 shadow-sm md:px-6">
+          <header className="sticky top-0 z-30 flex h-14 min-h-[56px] items-center gap-2 border-b border-slate-200/90 bg-white/95 px-4 shadow-sm backdrop-blur-sm dark:border-slate-800/90 dark:bg-slate-950/90 md:gap-3 md:px-6">
             <button
               type="button"
               onClick={() => {
@@ -43,16 +44,17 @@ export function Layout() {
                   setSidebarMobileOpen((o) => !o)
                 }
               }}
-              className="flex size-10 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 active:bg-slate-200 touch-manipulation md:size-9"
+              className="flex size-10 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 active:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-800 dark:active:bg-slate-700 touch-manipulation md:size-9"
               aria-label="Abrir ou recolher menu"
               aria-expanded={sidebarMobileOpen}
             >
               {menuIcon}
             </button>
             <div className="min-w-0 flex-1" />
+            <ThemeToggle />
             <div className="hidden min-w-0 text-right sm:block">
-              <p className="truncate text-sm font-medium text-slate-800">{user?.nome}</p>
-              <p className="truncate text-xs text-slate-500">{user?.role}</p>
+              <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{user?.nome}</p>
+              <p className="truncate text-xs text-slate-500 dark:text-slate-400">{user?.role}</p>
             </div>
           </header>
 

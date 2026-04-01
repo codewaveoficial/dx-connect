@@ -1,8 +1,11 @@
+from enum import Enum
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_
+from sqlalchemy import or_, asc
 
 from app.database import get_db
+from app.core.ordenacao_lista import OrdemLista, expr_ordem
 from app.models import Rede, Empresa, FuncionarioRede, FuncionarioRedeEmpresa
 from app.models.atendente import Atendente
 from app.schemas.rede import RedeCreate, RedeUpdate, RedeRead
@@ -17,12 +20,20 @@ _MAX_PAGE = 100
 _DEFAULT_PAGE = 20
 
 
+class OrdenarRedesPor(str, Enum):
+    nome = "nome"
+    ativo = "ativo"
+    created_at = "created_at"
+
+
 @router.get("", response_model=ListaPaginada[RedeRead])
 def listar_redes(
     incluir_inativos: bool = Query(False, description="Incluir redes inativas"),
     busca: str | None = Query(None, description="Filtra por nome"),
     offset: int = Query(0, ge=0),
     limit: int = Query(_DEFAULT_PAGE, ge=1, le=_MAX_PAGE),
+    ordenar_por: OrdenarRedesPor | None = Query(None),
+    ordem: OrdemLista = Query(OrdemLista.asc),
     db: Session = Depends(get_db),
     _: Atendente = Depends(exigir_admin),
 ):
@@ -33,7 +44,17 @@ def listar_redes(
         term = f"%{busca.strip()}%"
         q = q.filter(Rede.nome.ilike(term))
     total = q.count()
-    items = q.order_by(Rede.nome).offset(offset).limit(limit).all()
+    if ordenar_por is None:
+        order_cols = [Rede.nome.asc(), Rede.id.asc()]
+    else:
+        if ordenar_por == OrdenarRedesPor.nome:
+            primary = expr_ordem(Rede.nome, ordem)
+        elif ordenar_por == OrdenarRedesPor.ativo:
+            primary = expr_ordem(Rede.ativo, ordem)
+        else:
+            primary = expr_ordem(Rede.created_at, ordem)
+        order_cols = [primary, expr_ordem(Rede.id, ordem)]
+    items = q.order_by(*order_cols).offset(offset).limit(limit).all()
     return ListaPaginada(items=items, total=total)
 
 
@@ -52,6 +73,12 @@ def criar_rede(
     return rede
 
 
+class OrdenarFuncRedePor(str, Enum):
+    nome = "nome"
+    email = "email"
+    tipo = "tipo"
+
+
 @router.get("/{rede_id}/funcionarios", response_model=ListaPaginada[FuncionarioRedeComVinculo])
 def listar_funcionarios_da_rede(
     rede_id: int,
@@ -59,6 +86,8 @@ def listar_funcionarios_da_rede(
     busca: str | None = Query(None, description="Filtra por nome ou e-mail"),
     offset: int = Query(0, ge=0),
     limit: int = Query(_DEFAULT_PAGE, ge=1, le=_MAX_PAGE),
+    ordenar_por: OrdenarFuncRedePor | None = Query(None),
+    ordem: OrdemLista = Query(OrdemLista.asc),
     db: Session = Depends(get_db),
     _: Atendente = Depends(exigir_admin),
 ):
@@ -81,7 +110,6 @@ def listar_funcionarios_da_rede(
         db.query(FuncionarioRede)
         .options(joinedload(FuncionarioRede.empresas_supervisor).joinedload(FuncionarioRedeEmpresa.empresa))
         .filter(or_(*condicoes))
-        .order_by(FuncionarioRede.nome)
     )
     if not incluir_inativos:
         q = q.filter(FuncionarioRede.ativo.is_(True))
@@ -89,7 +117,15 @@ def listar_funcionarios_da_rede(
         term = f"%{busca.strip()}%"
         q = q.filter(or_(FuncionarioRede.nome.ilike(term), FuncionarioRede.email.ilike(term)))
     total = q.count()
-    rows = q.offset(offset).limit(limit).all()
+    if ordenar_por is None:
+        order_cols = [FuncionarioRede.nome.asc(), FuncionarioRede.id.asc()]
+    elif ordenar_por == OrdenarFuncRedePor.nome:
+        order_cols = [expr_ordem(FuncionarioRede.nome, ordem), expr_ordem(FuncionarioRede.id, ordem)]
+    elif ordenar_por == OrdenarFuncRedePor.email:
+        order_cols = [expr_ordem(FuncionarioRede.email, ordem), expr_ordem(FuncionarioRede.id, ordem)]
+    else:
+        order_cols = [expr_ordem(FuncionarioRede.tipo, ordem), expr_ordem(FuncionarioRede.id, ordem)]
+    rows = q.order_by(*order_cols).offset(offset).limit(limit).all()
     result = []
     for f in rows:
         if f.tipo == "socio":

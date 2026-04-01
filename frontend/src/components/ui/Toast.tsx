@@ -60,25 +60,25 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col gap-2">
         {toasts.map((toast) => {
-          let bg = 'bg-slate-800'
-          let text = 'text-white'
+          let styles =
+            'bg-slate-800 text-white dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-600/60'
           if (toast.type === 'success') {
-            bg = 'bg-emerald-50 border border-emerald-200'
-            text = 'text-emerald-900'
+            styles =
+              'bg-emerald-50 border border-emerald-200 text-emerald-900 dark:bg-emerald-950/60 dark:border-emerald-800/70 dark:text-emerald-100'
           }
           if (toast.type === 'error') {
-            bg = 'bg-red-50 border border-red-200'
-            text = 'text-red-900'
+            styles =
+              'bg-red-50 border border-red-200 text-red-900 dark:bg-red-950/50 dark:border-red-800/70 dark:text-red-100'
           }
           if (toast.type === 'warning') {
-            bg = 'bg-amber-50 border border-amber-200'
-            text = 'text-amber-900'
+            styles =
+              'bg-amber-50 border border-amber-200 text-amber-900 dark:bg-amber-950/50 dark:border-amber-800/70 dark:text-amber-100'
           }
 
           return (
             <div
               key={toast.id}
-              className={`${bg} pointer-events-auto flex min-w-[260px] max-w-sm items-start gap-3 rounded-lg px-4 py-3 text-sm ${text} shadow-lg`}
+              className={`${styles} pointer-events-auto flex min-w-[260px] max-w-sm items-start gap-3 rounded-lg px-4 py-3 text-sm shadow-lg`}
             >
               <span className="mt-0.5">
                 {toast.type === 'success' && '✓'}

@@ -1,10 +1,13 @@
+from enum import Enum
+
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import or_
+from sqlalchemy import or_, nullslast
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models import AuditLog
 from app.models.atendente import Atendente
+from app.core.ordenacao_lista import OrdemLista, expr_ordem
 from app.schemas.audit_log import AuditLogRead
 from app.schemas.lista_paginada import ListaPaginada
 from app.core.auth import exigir_admin
@@ -15,6 +18,14 @@ _MAX_PAGE = 100
 _DEFAULT_PAGE = 20
 
 
+class OrdenarAuditPor(str, Enum):
+    created_at = "created_at"
+    entity_type = "entity_type"
+    entity_id = "entity_id"
+    action = "action"
+    atendente = "atendente"
+
+
 @router.get("", response_model=ListaPaginada[AuditLogRead])
 def listar_audit(
     entity_type: str | None = Query(None, description="Filtrar por tipo: rede, empresa, setor, atendente, funcionario_rede, status_ticket"),
@@ -22,6 +33,8 @@ def listar_audit(
     busca: str | None = Query(None, description="Tipo de entidade ou nome do atendente"),
     offset: int = Query(0, ge=0),
     limit: int = Query(_DEFAULT_PAGE, ge=1, le=_MAX_PAGE),
+    ordenar_por: OrdenarAuditPor | None = Query(None),
+    ordem: OrdemLista = Query(OrdemLista.asc),
     db: Session = Depends(get_db),
     _: Atendente = Depends(exigir_admin),
 ):
@@ -35,7 +48,22 @@ def listar_audit(
         atendente_ids = db.query(Atendente.id).filter(Atendente.nome.ilike(term))
         q = q.filter(or_(AuditLog.entity_type.ilike(term), AuditLog.atendente_id.in_(atendente_ids)))
     total = q.count()
-    rows = q.order_by(AuditLog.created_at.desc()).offset(offset).limit(limit).all()
+    if ordenar_por is None:
+        order_cols = [AuditLog.created_at.desc(), AuditLog.id.desc()]
+    else:
+        if ordenar_por == OrdenarAuditPor.atendente:
+            q = q.outerjoin(AuditLog.atendente)
+            primary = nullslast(expr_ordem(Atendente.nome, ordem))
+        elif ordenar_por == OrdenarAuditPor.created_at:
+            primary = expr_ordem(AuditLog.created_at, ordem)
+        elif ordenar_por == OrdenarAuditPor.entity_type:
+            primary = expr_ordem(AuditLog.entity_type, ordem)
+        elif ordenar_por == OrdenarAuditPor.entity_id:
+            primary = expr_ordem(AuditLog.entity_id, ordem)
+        else:
+            primary = expr_ordem(AuditLog.action, ordem)
+        order_cols = [primary, expr_ordem(AuditLog.id, ordem)]
+    rows = q.order_by(*order_cols).offset(offset).limit(limit).all()
     items = [
         AuditLogRead(
             id=r.id,

@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { CabecalhoOrdenavel } from '../components/ui/CabecalhoOrdenavel'
+import { useOrdenacaoLista } from '../hooks/useOrdenacaoLista'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { empresas as apiEmpresas, redes, tiposNegocio, type Empresas, type Redes, type TiposNegocio } from '../api/client'
 import { coletarTodasPaginas } from '../api/collectPages'
@@ -15,8 +17,11 @@ import { maskCnpjCpf, digitsOnly, isCnpj } from '../utils/maskCnpjCpf'
 import { BarraBuscaPaginacao, PAGE_SIZE_PADRAO } from '../components/ui/BarraBuscaPaginacao'
 import { Switch } from '../components/ui/Switch'
 
+type ColunaEmpresa = 'nome' | 'cnpj_cpf' | 'rede'
+
 export function Empresas() {
   const navigate = useNavigate()
+  const { ordenarPor, ordem, aoOrdenarColuna, sortParams } = useOrdenacaoLista<ColunaEmpresa>()
   const location = useLocation()
   const toast = useToast()
   const [list, setList] = useState<Empresas.Empresa[]>([])
@@ -58,7 +63,7 @@ export function Empresas() {
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedBusca, incluirInativos])
+  }, [debouncedBusca, incluirInativos, ordenarPor, ordem])
 
   function load() {
     setLoading(true)
@@ -66,6 +71,7 @@ export function Empresas() {
       .list({
         incluir_inativos: incluirInativos,
         busca: debouncedBusca || undefined,
+        ...sortParams,
         offset: (page - 1) * PAGE_SIZE_PADRAO,
         limit: PAGE_SIZE_PADRAO,
       })
@@ -78,7 +84,7 @@ export function Empresas() {
 
   useEffect(() => {
     load()
-  }, [page, debouncedBusca, incluirInativos])
+  }, [page, debouncedBusca, incluirInativos, ordenarPor, ordem])
 
   useEffect(() => {
     coletarTodasPaginas<Redes.Rede>((o, l) => redes.list({ incluir_inativos: true, offset: o, limit: l })).then(
@@ -240,7 +246,7 @@ export function Empresas() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between">
-        <h1 className="text-2xl font-bold text-slate-800">Empresas</h1>
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Empresas</h1>
         <Button onClick={openCreate} disabled={modalOpen}>Nova empresa</Button>
       </div>
 
@@ -276,14 +282,14 @@ export function Empresas() {
 
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
               <div className="flex-1">
-                <label className="mb-1 block text-sm font-medium text-slate-700">CNPJ / CPF</label>
+                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">CNPJ / CPF</label>
                 <input
                   type="text"
                   inputMode="numeric"
                   placeholder="00.000.000/0001-00 ou 000.000.000-00"
                   value={cnpjCpf}
                   onChange={(e) => handleCnpjCpfChange(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                  className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2"
                 />
               </div>
               <Button type="button" variant="secondary" onClick={handleConsultarCnpj} disabled={loadingCnpj} className="shrink-0 sm:w-auto" aria-label="Consultar CNPJ">
@@ -302,8 +308,8 @@ export function Empresas() {
             </div>
             <Input label="Inscrição estadual" value={inscricaoEstadual} onChange={(e) => setInscricaoEstadual(e.target.value)} />
 
-            <div className="border-t border-slate-200 pt-3 mt-2">
-              <p className="mb-2 text-sm font-medium text-slate-700">Endereço</p>
+            <div className="border-t border-slate-200 dark:border-slate-700/80 pt-3 mt-2">
+              <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Endereço</p>
               <div className="space-y-3">
                 <Input label="Logradouro" value={endereco} onChange={(e) => setEndereco(e.target.value)} />
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -326,7 +332,7 @@ export function Empresas() {
 
             <Switch checked={ativo} onCheckedChange={setAtivo} label="Ativo" description="Inativas ficam ocultas nos filtros padrão." />
 
-            <div className="flex gap-2 pt-2 border-t border-slate-200">
+            <div className="flex gap-2 pt-2 border-t border-slate-200 dark:border-slate-700/80">
               <Button type="submit" loading={saving}>Salvar</Button>
               <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>Cancelar</Button>
             </div>
@@ -348,21 +354,42 @@ export function Empresas() {
             extra={<FiltroInativos incluirInativos={incluirInativos} onChange={setIncluirInativos} />}
           />
         {loading ? (
-          <p className="text-slate-500">Carregando...</p>
+          <p className="text-slate-500 dark:text-slate-400">Carregando...</p>
         ) : list.length === 0 ? (
-          <p className="text-slate-500">Nenhuma empresa encontrada.</p>
+          <p className="text-slate-500 dark:text-slate-400">Nenhuma empresa encontrada.</p>
         ) : (
           <div className="-mx-2 overflow-x-auto rounded-lg">
             <table className="w-full min-w-[600px] text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  <th className="whitespace-nowrap py-2.5 pl-2 pr-4">Empresa</th>
-                  <th className="whitespace-nowrap py-2.5 pr-4">CNPJ / CPF</th>
-                  <th className="min-w-[8rem] py-2.5 pr-4">Rede</th>
+                <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                  <CabecalhoOrdenavel
+                    coluna="nome"
+                    rotulo="Empresa"
+                    ordenarPor={ordenarPor}
+                    ordem={ordem}
+                    aoOrdenar={aoOrdenarColuna}
+                    className="py-2.5 pl-2 pr-4"
+                  />
+                  <CabecalhoOrdenavel
+                    coluna="cnpj_cpf"
+                    rotulo="CNPJ / CPF"
+                    ordenarPor={ordenarPor}
+                    ordem={ordem}
+                    aoOrdenar={aoOrdenarColuna}
+                    className="py-2.5 pr-4"
+                  />
+                  <CabecalhoOrdenavel
+                    coluna="rede"
+                    rotulo="Rede"
+                    ordenarPor={ordenarPor}
+                    ordem={ordem}
+                    aoOrdenar={aoOrdenarColuna}
+                    className="min-w-[8rem] py-2.5 pr-4"
+                  />
                   <th className="w-px py-2.5 pr-2 text-right" aria-hidden />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {list.map((e) => {
                   const redeNome = redesList.find((r) => r.id === e.rede_id)?.nome ?? '—'
                   const doc = e.cnpj_cpf ? maskCnpjCpf(e.cnpj_cpf) : '—'
@@ -378,18 +405,24 @@ export function Empresas() {
                           navigate(`/empresas/${e.id}`)
                         }
                       }}
-                      className="cursor-pointer transition-colors hover:bg-slate-50/90 focus-within:bg-slate-50/90"
+                      className="cursor-pointer transition-colors hover:bg-slate-50/90 focus-within:bg-slate-50/90 dark:hover:bg-slate-800/50 dark:focus-within:bg-slate-800/50"
                     >
                       <td className="max-w-0 py-3 pl-2 pr-4">
                         <div className="flex min-w-0 flex-wrap items-center gap-2">
-                          <span className={`truncate font-medium ${e.ativo ? 'text-slate-800' : 'text-slate-400'}`}>{e.nome}</span>
+                          <span className={`truncate font-medium ${e.ativo ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>
+                            {e.nome}
+                          </span>
                           {!e.ativo && (
-                            <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600">Inativo</span>
+                            <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-400">
+                              Inativo
+                            </span>
                           )}
                         </div>
                       </td>
-                      <td className="whitespace-nowrap py-3 pr-4 font-mono text-xs text-slate-600 tabular-nums">{doc}</td>
-                      <td className="max-w-[14rem] truncate py-3 pr-4 text-slate-600" title={redeNome}>
+                      <td className="whitespace-nowrap py-3 pr-4 font-mono text-xs text-slate-600 tabular-nums dark:text-slate-400">
+                        {doc}
+                      </td>
+                      <td className="max-w-[14rem] truncate py-3 pr-4 text-slate-600 dark:text-slate-400" title={redeNome}>
                         {redeNome}
                       </td>
                       <td className="py-3 pr-2 text-right" onClick={(ev) => ev.stopPropagation()}>

@@ -1,0 +1,18 @@
+# Backend apontando para PostgreSQL externo (ex.: Hostinger).
+# Uso: docker compose -f docker-compose.prod.yml up -d --build
+# Configure backend/.env com DATABASE_URL, SECRET_KEY (32+ chars), CORS_ORIGINS, ENVIRONMENT=production.
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dx-connect-api
+    env_file:
+      - ./backend/.env
+    environment:
+      ENVIRONMENT: production
+    # Só localhost: use com Nginx no mesmo VPS (proxy para 127.0.0.1:8000). Para testar API sem Nginx, troque por "8000:8000".
+    ports:
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped

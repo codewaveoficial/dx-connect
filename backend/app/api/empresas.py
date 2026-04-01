@@ -2,12 +2,14 @@ import re
 import urllib.request
 import urllib.error
 import json
+from enum import Enum
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.core.ordenacao_lista import OrdemLista, expr_ordem
 from app.models import Empresa, Rede, Ticket, FuncionarioRede, FuncionarioRedeEmpresa
 from app.models.atendente import Atendente
 from app.schemas.empresa import EmpresaCreate, EmpresaUpdate, EmpresaRead, ConsultaCNPJResponse
@@ -19,6 +21,14 @@ router = APIRouter(prefix="/empresas", tags=["empresas"])
 
 _MAX_PAGE = 100
 _DEFAULT_PAGE = 20
+
+
+class OrdenarEmpresasPor(str, Enum):
+    nome = "nome"
+    cnpj_cpf = "cnpj_cpf"
+    cidade = "cidade"
+    rede = "rede"
+    ativo = "ativo"
 
 
 def _pode_ver_empresa(atendente: Atendente, empresa_id: int, db: Session) -> bool:
@@ -39,6 +49,8 @@ def listar_empresas(
     busca: str | None = Query(None, description="Nome, razão social, fantasia, CNPJ ou e-mail"),
     offset: int = Query(0, ge=0),
     limit: int = Query(_DEFAULT_PAGE, ge=1, le=_MAX_PAGE),
+    ordenar_por: OrdenarEmpresasPor | None = Query(None),
+    ordem: OrdemLista = Query(OrdemLista.asc),
     db: Session = Depends(get_db),
     _: Atendente = Depends(obter_atendente_atual),
 ):
@@ -59,7 +71,22 @@ def listar_empresas(
             )
         )
     total = q.count()
-    items = q.order_by(Empresa.nome).offset(offset).limit(limit).all()
+    if ordenar_por is None:
+        order_cols = [Empresa.nome.asc(), Empresa.id.asc()]
+    else:
+        if ordenar_por == OrdenarEmpresasPor.rede:
+            q = q.join(Empresa.rede)
+            primary = expr_ordem(Rede.nome, ordem)
+        elif ordenar_por == OrdenarEmpresasPor.nome:
+            primary = expr_ordem(Empresa.nome, ordem)
+        elif ordenar_por == OrdenarEmpresasPor.cnpj_cpf:
+            primary = expr_ordem(Empresa.cnpj_cpf, ordem)
+        elif ordenar_por == OrdenarEmpresasPor.cidade:
+            primary = expr_ordem(Empresa.cidade, ordem)
+        else:
+            primary = expr_ordem(Empresa.ativo, ordem)
+        order_cols = [primary, expr_ordem(Empresa.id, ordem)]
+    items = q.order_by(*order_cols).offset(offset).limit(limit).all()
     return ListaPaginada(items=items, total=total)
 
 

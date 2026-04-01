@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { CabecalhoOrdenavel } from '../components/ui/CabecalhoOrdenavel'
+import { useOrdenacaoLista } from '../hooks/useOrdenacaoLista'
 import { statusTicket, type StatusTicket } from '../api/client'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -8,7 +10,10 @@ import { FiltroInativos } from '../components/ui/FiltroInativos'
 import { BarraBuscaPaginacao, PAGE_SIZE_PADRAO } from '../components/ui/BarraBuscaPaginacao'
 import { Switch } from '../components/ui/Switch'
 
+type ColunaStatus = 'nome' | 'slug' | 'ordem' | 'ativo'
+
 export function StatusTicketPage() {
+  const { ordenarPor, ordem: ordemLista, aoOrdenarColuna, sortParams } = useOrdenacaoLista<ColunaStatus>()
   const [list, setList] = useState<StatusTicket.Status[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -32,7 +37,7 @@ export function StatusTicketPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedBusca, incluirInativos])
+  }, [debouncedBusca, incluirInativos, ordenarPor, ordemLista])
 
   function load() {
     setLoading(true)
@@ -40,6 +45,7 @@ export function StatusTicketPage() {
       .list({
         incluir_inativos: incluirInativos,
         busca: debouncedBusca || undefined,
+        ...sortParams,
         offset: (page - 1) * PAGE_SIZE_PADRAO,
         limit: PAGE_SIZE_PADRAO,
       })
@@ -52,7 +58,7 @@ export function StatusTicketPage() {
 
   useEffect(() => {
     load()
-  }, [page, debouncedBusca, incluirInativos])
+  }, [page, debouncedBusca, incluirInativos, ordenarPor, ordemLista])
 
   function openCreate() {
     setEditingId(null)
@@ -96,7 +102,7 @@ export function StatusTicketPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between">
-        <h1 className="text-2xl font-bold text-slate-800">Status de ticket</h1>
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Status de ticket</h1>
         <Button onClick={openCreate}>Novo status</Button>
       </div>
       {!modalOpen && (
@@ -112,32 +118,60 @@ export function StatusTicketPage() {
             extra={<FiltroInativos incluirInativos={incluirInativos} onChange={setIncluirInativos} />}
           />
         {loading ? (
-          <p className="text-slate-500">Carregando...</p>
+          <p className="text-slate-500 dark:text-slate-400">Carregando...</p>
         ) : list.length === 0 ? (
-          <p className="text-slate-500">Nenhum status encontrado.</p>
+          <p className="text-slate-500 dark:text-slate-400">Nenhum status encontrado.</p>
         ) : (
-          <ul className="divide-y divide-slate-200">
-            {list.map((s) => (
-              <li
-                key={s.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => openEdit(s)}
-                onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); openEdit(s); } }}
-                className="flex cursor-pointer items-center justify-between rounded-lg py-3 px-2 -mx-2 transition-colors duration-150 hover:bg-slate-50/80 focus:outline-none focus:bg-slate-50/80"
-              >
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <span className={`font-medium ${s.ativo ? 'text-slate-800' : 'text-slate-400'}`}>{s.nome}</span>
-                  {!s.ativo && <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600">Inativo</span>}
-                  <span className="text-slate-500 text-sm">{s.slug}</span>
-                  <span className="text-slate-400">ordem: {s.ordem}</span>
-                </div>
-                <div className="shrink-0" onClick={(ev) => ev.stopPropagation()}>
-                  <Button variant="ghost" onClick={() => openEdit(s)} aria-label="Editar"><IconPencil /></Button>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-800/40">
+                  <CabecalhoOrdenavel coluna="nome" rotulo="Nome" ordenarPor={ordenarPor} ordem={ordemLista} aoOrdenar={aoOrdenarColuna} />
+                  <CabecalhoOrdenavel coluna="slug" rotulo="Slug" ordenarPor={ordenarPor} ordem={ordemLista} aoOrdenar={aoOrdenarColuna} />
+                  <CabecalhoOrdenavel coluna="ordem" rotulo="Ordem" ordenarPor={ordenarPor} ordem={ordemLista} aoOrdenar={aoOrdenarColuna} />
+                  <CabecalhoOrdenavel coluna="ativo" rotulo="Situação" ordenarPor={ordenarPor} ordem={ordemLista} aoOrdenar={aoOrdenarColuna} />
+                  <th className="w-px px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500 sm:px-6 dark:text-slate-400">
+                    <span className="sr-only">Ações</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {list.map((s) => (
+                  <tr
+                    key={s.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openEdit(s)}
+                    onKeyDown={(ev) => {
+                      if (ev.key === 'Enter' || ev.key === ' ') {
+                        ev.preventDefault()
+                        openEdit(s)
+                      }
+                    }}
+                    className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 focus:outline-none focus-visible:bg-slate-100/80 dark:focus-visible:bg-slate-800/60"
+                  >
+                    <td className="px-4 py-3.5 sm:px-6">
+                      <span className={`font-medium ${s.ativo ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400'}`}>{s.nome}</span>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3.5 text-slate-600 sm:px-6 dark:text-slate-400">{s.slug}</td>
+                    <td className="whitespace-nowrap px-4 py-3.5 tabular-nums text-slate-600 sm:px-6 dark:text-slate-400">{s.ordem}</td>
+                    <td className="whitespace-nowrap px-4 py-3.5 sm:px-6">
+                      {s.ativo ? (
+                        <span className="text-slate-600 dark:text-slate-400">Ativo</span>
+                      ) : (
+                        <span className="rounded bg-slate-200 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-400">Inativo</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5 text-right sm:px-6" onClick={(ev) => ev.stopPropagation()}>
+                      <Button variant="ghost" onClick={() => openEdit(s)} aria-label="Editar">
+                        <IconPencil />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
         </Card>
       )}

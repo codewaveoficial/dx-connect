@@ -1,8 +1,11 @@
+from enum import Enum
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy import or_
+from sqlalchemy import or_, asc
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.core.ordenacao_lista import OrdemLista, expr_ordem
 from app.models import StatusTicket
 from app.models.atendente import Atendente
 from app.schemas.status_ticket import StatusTicketCreate, StatusTicketUpdate, StatusTicketRead
@@ -16,12 +19,21 @@ _MAX_PAGE = 100
 _DEFAULT_PAGE = 20
 
 
+class OrdenarStatusPor(str, Enum):
+    nome = "nome"
+    slug = "slug"
+    ordem = "ordem"
+    ativo = "ativo"
+
+
 @router.get("", response_model=ListaPaginada[StatusTicketRead])
 def listar(
     incluir_inativos: bool = Query(False, description="Incluir status inativos"),
     busca: str | None = Query(None, description="Filtra por nome ou slug"),
     offset: int = Query(0, ge=0),
     limit: int = Query(_DEFAULT_PAGE, ge=1, le=_MAX_PAGE),
+    ordenar_por: OrdenarStatusPor | None = Query(None),
+    ordem: OrdemLista = Query(OrdemLista.asc),
     db: Session = Depends(get_db),
     _: Atendente = Depends(obter_atendente_atual),
 ):
@@ -32,7 +44,17 @@ def listar(
         term = f"%{busca.strip()}%"
         q = q.filter(or_(StatusTicket.nome.ilike(term), StatusTicket.slug.ilike(term)))
     total = q.count()
-    items = q.order_by(StatusTicket.ordem, StatusTicket.nome).offset(offset).limit(limit).all()
+    if ordenar_por is None:
+        order_cols = [StatusTicket.ordem.asc(), StatusTicket.nome.asc(), StatusTicket.id.asc()]
+    elif ordenar_por == OrdenarStatusPor.nome:
+        order_cols = [expr_ordem(StatusTicket.nome, ordem), expr_ordem(StatusTicket.id, ordem)]
+    elif ordenar_por == OrdenarStatusPor.slug:
+        order_cols = [expr_ordem(StatusTicket.slug, ordem), expr_ordem(StatusTicket.id, ordem)]
+    elif ordenar_por == OrdenarStatusPor.ordem:
+        order_cols = [expr_ordem(StatusTicket.ordem, ordem), expr_ordem(StatusTicket.id, ordem)]
+    else:
+        order_cols = [expr_ordem(StatusTicket.ativo, ordem), expr_ordem(StatusTicket.id, ordem)]
+    items = q.order_by(*order_cols).offset(offset).limit(limit).all()
     return ListaPaginada(items=items, total=total)
 
 

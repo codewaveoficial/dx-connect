@@ -180,8 +180,8 @@ export function Sidebar({
   const linkClass = (to: string, base = '') =>
     `${base} flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors touch-manipulation min-h-[44px] ${
       location.pathname === to || (to !== '/' && location.pathname.startsWith(to))
-        ? 'bg-slate-200 text-slate-900'
-        : 'text-slate-600 hover:bg-slate-100 active:bg-slate-200'
+        ? 'bg-cyan-50 text-slate-900 ring-1 ring-cyan-200/60 dark:bg-cyan-950/35 dark:text-slate-100 dark:ring-cyan-800/50'
+        : 'text-slate-600 hover:bg-slate-100 active:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:active:bg-slate-800'
     } ${!expanded ? 'md:justify-center md:px-0 md:gap-0' : ''}`
 
   const isGroupOpen = (id: string) => openGroup === id
@@ -189,21 +189,28 @@ export function Sidebar({
 
   const sidebarContent = (
     <>
-      <div className={`flex h-14 shrink-0 items-center justify-center border-b border-slate-200 ${expanded ? 'px-3' : 'md:px-0'}`}>
+      <div className={`flex h-14 shrink-0 items-center justify-center border-b border-slate-200 dark:border-slate-800 ${expanded ? 'px-3' : 'md:px-0'}`}>
         <Link
           to="/"
           onClick={onMobileClose}
-          className={`flex items-center overflow-hidden rounded-lg ${expanded ? 'min-w-0 flex-1 gap-2' : 'md:w-full md:justify-center md:gap-0'}`}
+          className={`flex items-center overflow-hidden rounded-lg ${expanded ? 'min-w-0 flex-1 gap-2.5' : 'md:w-full md:justify-center md:gap-0'}`}
         >
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-white font-bold text-sm">
-            DX
-          </span>
+          <img
+            src="/dx-connect-mark.png"
+            alt=""
+            width={36}
+            height={36}
+            className="size-9 shrink-0 object-contain md:size-8 dark:brightness-0 dark:invert dark:opacity-95"
+            decoding="async"
+            aria-hidden
+          />
           <span
-            className={`truncate font-semibold text-slate-800 transition-all duration-200 ${
+            className={`min-w-0 truncate text-[0.95rem] font-semibold leading-tight transition-all duration-200 ${
               expanded ? 'opacity-100 w-auto' : 'md:opacity-0 md:w-0 md:overflow-hidden md:max-w-0'
             }`}
           >
-            DX Connect
+            <span className="bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text font-bold text-transparent">DX</span>
+            <span className="font-medium text-slate-700 dark:text-slate-200"> Connect</span>
           </span>
         </Link>
       </div>
@@ -246,7 +253,9 @@ export function Sidebar({
                       type="button"
                       onClick={() => setOpenGroup(open ? null : group.id)}
                       className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors touch-manipulation min-h-[44px] ${
-                        active ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-100'
+                        active
+                          ? 'bg-cyan-50/80 text-slate-900 ring-1 ring-cyan-200/50 dark:bg-cyan-950/30 dark:text-slate-100 dark:ring-cyan-800/40'
+                          : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800/80'
                       }`}
                       aria-expanded={open}
                       aria-controls={`nav-group-${group.id}`}
@@ -282,8 +291,8 @@ export function Sidebar({
                     <button
                       type="button"
                       onClick={() => setOpenFlyout(isFlyoutOpen(group.id) ? null : group.id)}
-                      className={`flex w-full items-center justify-center rounded-lg py-2.5 text-slate-600 hover:bg-slate-100 min-h-[44px] px-2 md:px-0 ${
-                        active ? 'bg-slate-100 text-slate-900' : ''
+                      className={`flex w-full items-center justify-center rounded-lg py-2.5 text-slate-600 hover:bg-slate-100 min-h-[44px] px-2 dark:text-slate-400 dark:hover:bg-slate-800/80 md:px-0 ${
+                        active ? 'bg-cyan-50 text-slate-900 ring-1 ring-cyan-200/60 dark:bg-cyan-950/35 dark:text-slate-100 dark:ring-cyan-800/50' : ''
                       }`}
                       aria-expanded={isFlyoutOpen(group.id)}
                       aria-haspopup="true"
@@ -298,7 +307,7 @@ export function Sidebar({
                           onClick={() => setOpenFlyout(null)}
                         />
                         <ul
-                          className="absolute left-full top-0 z-50 ml-1 min-w-[200px] rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+                          className="absolute left-full top-0 z-50 ml-1 min-w-[200px] rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900"
                           role="menu"
                         >
                           {group.children.map((child) => (
@@ -309,7 +318,7 @@ export function Sidebar({
                                   onMobileClose()
                                   setOpenFlyout(null)
                                 }}
-                                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
                                 role="menuitem"
                               >
                                 {icons[child.icon]}
@@ -328,18 +337,18 @@ export function Sidebar({
         </ul>
       </nav>
 
-      <div className={`border-t border-slate-200 p-2 ${!expanded ? 'md:px-0' : ''}`}>
+      <div className={`border-t border-slate-200 p-2 dark:border-slate-800 ${!expanded ? 'md:px-0' : ''}`}>
         <div
-          className={`flex items-center gap-3 px-3 py-2 text-slate-600 ${
+          className={`flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-400 ${
             expanded ? 'opacity-100' : 'md:opacity-0 md:overflow-hidden md:w-0 md:px-0'
           }`}
         >
-          <span className="size-8 shrink-0 rounded-full bg-slate-200 flex items-center justify-center text-xs font-medium text-slate-600">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 text-xs font-semibold text-white shadow-sm shadow-cyan-500/25">
             {userNome?.charAt(0)?.toUpperCase() ?? '?'}
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-slate-800">{userNome}</p>
-            <p className="truncate text-xs text-slate-500">{userRole}</p>
+            <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{userNome}</p>
+            <p className="truncate text-xs text-slate-500 dark:text-slate-400">{userRole}</p>
           </div>
         </div>
         <button
@@ -348,7 +357,7 @@ export function Sidebar({
             onMobileClose()
             onLogout()
           }}
-          className={`mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-600 hover:bg-slate-100 active:bg-slate-200 touch-manipulation min-h-[44px] ${
+          className={`mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-600 hover:bg-slate-100 active:bg-slate-200 touch-manipulation min-h-[44px] dark:text-slate-400 dark:hover:bg-slate-800 dark:active:bg-slate-700 ${
             expanded ? '' : 'md:justify-center md:px-0'
           }`}
         >
@@ -381,7 +390,7 @@ export function Sidebar({
 
       {/* Sidebar: drawer no mobile, fixo no desktop */}
       <aside
-        className={`fixed top-0 left-0 z-50 flex h-full w-[280px] flex-col bg-white shadow-xl transition-[transform,width] duration-200 ease-out md:translate-x-0 md:shadow-none ${
+        className={`fixed top-0 left-0 z-50 flex h-full w-[280px] flex-col bg-white shadow-xl transition-[transform,width] duration-200 ease-out dark:bg-slate-950 md:translate-x-0 md:shadow-none md:dark:shadow-[inset_-1px_0_0_0_rgb(30_41_59_/_0.6)] ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         } ${expanded ? 'md:w-[280px]' : 'md:w-[72px]'}`}
         aria-label="Menu lateral"

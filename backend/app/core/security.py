@@ -10,11 +10,17 @@ def hash_senha(senha: str) -> str:
 
 
 def verificar_senha(senha: str, senha_hash: str) -> bool:
-    return bcrypt.checkpw(senha.encode("utf-8"), senha_hash.encode("utf-8"))
+    if not senha_hash:
+        return False
+    try:
+        return bcrypt.checkpw(senha.encode("utf-8"), senha_hash.encode("utf-8"))
+    except (ValueError, TypeError):
+        return False
 
 
 def criar_access_token(data: dict) -> str:
     to_encode = data.copy()
+    # Claims vão para JSON: usar timestamp numérico em exp (datetime quebra o encode).
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": int(expire.timestamp())})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
