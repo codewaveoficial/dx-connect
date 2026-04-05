@@ -7,6 +7,8 @@ from app.models.funcionario_rede import FuncionarioRede, FuncionarioRedeEmpresa
 from app.models.status_ticket import StatusTicket
 from app.models.ticket import Ticket, TicketHistorico, TicketMensagem
 from app.models.audit_log import AuditLog
+from app.models.ibge_municipio import IbgeMunicipio
+from app.models.app_cache_meta import AppCacheMeta
 
 __all__ = [
     "Rede",
@@ -22,4 +24,6 @@ __all__ = [
     "TicketHistorico",
     "TicketMensagem",
     "AuditLog",
+    "IbgeMunicipio",
+    "AppCacheMeta",
 ]

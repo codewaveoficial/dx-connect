@@ -132,6 +132,54 @@ export const redes = {
   delete: (id: number) => api<void>(`/redes/${id}`, { method: 'DELETE' }),
 };
 
+const CADASTRO_AUX_FETCH_MS = 60_000;
+
+function signalCadastroAux(external?: AbortSignal | null): AbortSignal {
+  const t = AbortSignal.timeout(CADASTRO_AUX_FETCH_MS);
+  if (!external) return t;
+  if (typeof AbortSignal.any === 'function') return AbortSignal.any([t, external]);
+  return external;
+}
+
+export namespace CadastroAux {
+  export interface Uf {
+    sigla: string;
+    nome: string;
+    ibge_id: number;
+  }
+  export interface MunicipiosResponse {
+    uf: string;
+    nomes: string[];
+  }
+  export interface CepEndereco {
+    cep: string;
+    logradouro: string;
+    complemento: string;
+    bairro: string;
+    localidade: string;
+    uf: string;
+  }
+}
+
+/** UF, municípios (IBGE) e CEP (ViaCEP) — sempre via backend. */
+export const cadastroAux = {
+  ufs: (init?: RequestInit) =>
+    api<CadastroAux.Uf[]>('/cadastro-aux/ufs', { ...init, signal: signalCadastroAux(init?.signal ?? null) }),
+  municipiosPorUf: (uf: string, init?: RequestInit) =>
+    api<CadastroAux.MunicipiosResponse>(
+      withParams('/cadastro-aux/municipios', { uf: uf.trim().toUpperCase() }),
+      { ...init, signal: signalCadastroAux(init?.signal ?? null) },
+    ),
+  consultarCep: (cep: string, init?: RequestInit) =>
+    api<CadastroAux.CepEndereco>(`/cadastro-aux/cep/${encodeURIComponent(cep.replace(/\D/g, ''))}`, {
+      ...init,
+      signal: signalCadastroAux(init?.signal ?? null),
+    }),
+  /** Recarrega todos os municípios do IBGE no servidor (somente admin). */
+  sincronizarMunicipios: () =>
+    api<{ ok: boolean; total: number }>('/cadastro-aux/municipios/sincronizar', { method: 'POST' }),
+};
+
 export const empresas = {
   list: (params?: {
     rede_id?: number;
@@ -246,6 +294,7 @@ export const audit = {
 export const tickets = {
   list: (params?: {
     empresa_id?: number;
+    rede_id?: number;
     setor_id?: number;
     status_id?: number;
     protocolo?: string;
@@ -329,6 +378,22 @@ export namespace Empresas {
     cep: string | null;
     email: string | null;
     telefone: string | null;
+    resp_legal_nome: string | null;
+    resp_legal_cpf: string | null;
+    resp_legal_rg: string | null;
+    resp_legal_orgao_emissor: string | null;
+    resp_legal_nacionalidade: string | null;
+    resp_legal_estado_civil: string | null;
+    resp_legal_cargo: string | null;
+    resp_legal_email: string | null;
+    resp_legal_telefone: string | null;
+    resp_legal_endereco: string | null;
+    resp_legal_numero: string | null;
+    resp_legal_complemento: string | null;
+    resp_legal_bairro: string | null;
+    resp_legal_cidade: string | null;
+    resp_legal_estado: string | null;
+    resp_legal_cep: string | null;
     ativo: boolean;
     created_at?: string | null;
     updated_at?: string | null;
@@ -368,6 +433,22 @@ export namespace Empresas {
     cep?: string | null;
     email?: string | null;
     telefone?: string | null;
+    resp_legal_nome?: string | null;
+    resp_legal_cpf?: string | null;
+    resp_legal_rg?: string | null;
+    resp_legal_orgao_emissor?: string | null;
+    resp_legal_nacionalidade?: string | null;
+    resp_legal_estado_civil?: string | null;
+    resp_legal_cargo?: string | null;
+    resp_legal_email?: string | null;
+    resp_legal_telefone?: string | null;
+    resp_legal_endereco?: string | null;
+    resp_legal_numero?: string | null;
+    resp_legal_complemento?: string | null;
+    resp_legal_bairro?: string | null;
+    resp_legal_cidade?: string | null;
+    resp_legal_estado?: string | null;
+    resp_legal_cep?: string | null;
     ativo?: boolean;
   }
   export interface Update {
@@ -387,6 +468,22 @@ export namespace Empresas {
     cep?: string | null;
     email?: string | null;
     telefone?: string | null;
+    resp_legal_nome?: string | null;
+    resp_legal_cpf?: string | null;
+    resp_legal_rg?: string | null;
+    resp_legal_orgao_emissor?: string | null;
+    resp_legal_nacionalidade?: string | null;
+    resp_legal_estado_civil?: string | null;
+    resp_legal_cargo?: string | null;
+    resp_legal_email?: string | null;
+    resp_legal_telefone?: string | null;
+    resp_legal_endereco?: string | null;
+    resp_legal_numero?: string | null;
+    resp_legal_complemento?: string | null;
+    resp_legal_bairro?: string | null;
+    resp_legal_cidade?: string | null;
+    resp_legal_estado?: string | null;
+    resp_legal_cep?: string | null;
     ativo?: boolean;
   }
 }

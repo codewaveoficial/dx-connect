@@ -29,7 +29,6 @@ export function TiposNegocio() {
   const [nome, setNome] = useState('')
   const [ativo, setAtivo] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedBusca(busca.trim()), 400)
@@ -65,7 +64,6 @@ export function TiposNegocio() {
     setEditingId(null)
     setNome('')
     setAtivo(true)
-    setError('')
     setModalOpen(true)
   }
 
@@ -73,24 +71,24 @@ export function TiposNegocio() {
     setEditingId(item.id)
     setNome(item.nome)
     setAtivo(item.ativo)
-    setError('')
     setModalOpen(true)
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError('')
     setSaving(true)
     try {
       if (editingId) {
         await tiposNegocio.update(editingId, { nome: nome.trim(), ativo })
+        toast.showSuccess('Tipo de negócio atualizado.')
       } else {
         await tiposNegocio.create({ nome: nome.trim(), ativo })
+        toast.showSuccess('Tipo de negócio cadastrado.')
       }
       setModalOpen(false)
       load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro')
+      toast.showError(err instanceof Error ? err.message : 'Erro')
     } finally {
       setSaving(false)
     }
@@ -188,7 +186,6 @@ export function TiposNegocio() {
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4">
           <Card title={editingId ? 'Editar tipo' : 'Novo tipo de negócio'} className="w-full max-w-md">
             <form onSubmit={handleSubmit} className="space-y-4">
-              {error && <div className="rounded bg-red-50 p-2 text-sm text-red-700">{error}</div>}
               <Input label="Nome" value={nome} onChange={(e) => setNome(e.target.value)} required />
               <Switch checked={ativo} onCheckedChange={setAtivo} label="Ativo" />
               <div className="flex gap-2">

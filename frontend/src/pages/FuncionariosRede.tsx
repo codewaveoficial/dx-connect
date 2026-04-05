@@ -51,7 +51,6 @@ export function FuncionariosRede() {
   const [empresaId, setEmpresaId] = useState<number | ''>('')
   const [empresaIds, setEmpresaIds] = useState<number[]>([])
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedBusca(busca.trim()), 400)
@@ -113,7 +112,6 @@ export function FuncionariosRede() {
       setRedeId(r)
       setEmpresaId(item.empresa_id ?? '')
       setEmpresaIds(item.empresa_ids ?? [])
-      setError('')
       setModalOpen(true)
     },
     [empresasList],
@@ -146,7 +144,6 @@ export function FuncionariosRede() {
     setRedeId(redePadraoRecente())
     setEmpresaId('')
     setEmpresaIds([])
-    setError('')
     setModalOpen(true)
   }
 
@@ -156,9 +153,8 @@ export function FuncionariosRede() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError('')
     if (!redeId) {
-      setError('Selecione a rede.')
+      toast.showWarning('Selecione a rede.')
       return
     }
     const rid = Number(redeId)
@@ -166,18 +162,18 @@ export function FuncionariosRede() {
     if (tipo === 'colaborador') {
       const em = empresasList.find((x) => x.id === empresaId)
       if (!em || em.rede_id !== rid) {
-        setError('Selecione uma empresa desta rede.')
+        toast.showWarning('Selecione uma empresa desta rede.')
         return
       }
     }
     if (tipo === 'supervisor') {
       if (!empresaIds.length) {
-        setError('Marque ao menos uma empresa da rede.')
+        toast.showWarning('Marque ao menos uma empresa da rede.')
         return
       }
       const invalid = empresaIds.some((id) => !empresasNaRede.some((e) => e.id === id))
       if (invalid) {
-        setError('Todas as empresas do supervisor devem ser da rede selecionada.')
+        toast.showWarning('Todas as empresas do supervisor devem ser da rede selecionada.')
         return
       }
     }
@@ -194,11 +190,13 @@ export function FuncionariosRede() {
       }
       if (editingId) {
         await funcionariosRede.update(editingId, payload)
+        toast.showSuccess('Funcionário atualizado.')
         setModalOpen(false)
         load()
         navigate(`/funcionarios-rede/${editingId}`, { replace: true })
       } else {
         const criado = await funcionariosRede.create(payload)
+        toast.showSuccess('Funcionário cadastrado.')
         setModalOpen(false)
         setBusca('')
         setDebouncedBusca('')
@@ -207,7 +205,7 @@ export function FuncionariosRede() {
         navigate(`/funcionarios-rede/${criado.id}`, { replace: true })
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro')
+      toast.showError(err instanceof Error ? err.message : 'Erro')
     } finally {
       setSaving(false)
     }
@@ -242,7 +240,6 @@ export function FuncionariosRede() {
         <div className="fixed inset-0 z-20 flex items-center justify-center overflow-y-auto bg-black/50 p-4">
           <Card title={editingId ? 'Editar funcionário' : 'Novo funcionário'} className="w-full max-w-lg">
             <form onSubmit={handleSubmit} className="space-y-4">
-              {error && <div className="rounded bg-red-50 p-2 text-sm text-red-700">{error}</div>}
               <Input label="Nome" value={nome} onChange={(e) => setNome(e.target.value)} required />
               <Input label="E-mail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               <Select

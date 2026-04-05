@@ -30,7 +30,6 @@ export function Setores() {
   const [slug, setSlug] = useState('')
   const [ativo, setAtivo] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedBusca(busca.trim()), 400)
@@ -67,7 +66,6 @@ export function Setores() {
     setNome('')
     setSlug('')
     setAtivo(true)
-    setError('')
     setModalOpen(true)
   }
 
@@ -76,24 +74,24 @@ export function Setores() {
     setNome(item.nome)
     setSlug(item.slug)
     setAtivo(item.ativo)
-    setError('')
     setModalOpen(true)
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError('')
     setSaving(true)
     try {
       if (editingId) {
         await setores.update(editingId, { nome: nome.trim(), slug: slug.trim(), ativo })
+        toast.showSuccess('Setor atualizado.')
       } else {
         await setores.create({ nome: nome.trim(), slug: slug.trim(), ativo })
+        toast.showSuccess('Setor cadastrado.')
       }
       setModalOpen(false)
       load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro')
+      toast.showError(err instanceof Error ? err.message : 'Erro')
     } finally {
       setSaving(false)
     }
@@ -193,7 +191,6 @@ export function Setores() {
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4">
           <Card title={editingId ? 'Editar setor' : 'Novo setor'} className="w-full max-w-md">
             <form onSubmit={handleSubmit} className="space-y-4">
-              {error && <div className="rounded bg-red-50 p-2 text-sm text-red-700">{error}</div>}
               <Input label="Nome" value={nome} onChange={(e) => setNome(e.target.value)} required />
               <Input label="Slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="ex: suporte" required />
               <Switch checked={ativo} onCheckedChange={setAtivo} label="Ativo" />

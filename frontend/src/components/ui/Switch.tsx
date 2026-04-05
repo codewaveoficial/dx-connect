@@ -9,6 +9,10 @@ export interface SwitchProps extends OmitBase {
   description?: string
   /** Sem caixa; só rótulo + interruptor */
   bare?: boolean
+  /** Selo textual (ex.: Ativa / Inativa) e trilha verde quando ligado — bom para status claro. */
+  showStatusPill?: boolean
+  statusOnText?: string
+  statusOffText?: string
 }
 
 /**
@@ -21,53 +25,84 @@ export function Switch({
   description,
   disabled,
   bare = false,
+  showStatusPill = false,
+  statusOnText = 'Ativa',
+  statusOffText = 'Inativa',
   className = '',
   id: idProp,
   ...rest
 }: SwitchProps) {
   const uid = useId()
   const id = idProp ?? `switch-${uid}`
+  const alignRow = description ? 'items-start' : 'items-center'
 
   return (
     <div
       className={
         bare
-          ? `flex w-full items-start justify-between gap-4 ${className}`
-          : `flex w-full items-start justify-between gap-4 rounded-xl border border-slate-200/90 bg-slate-50/60 px-4 py-3 ${className}`
+          ? `flex w-full ${alignRow} justify-between gap-3 ${className}`
+          : `flex w-full ${alignRow} justify-between gap-3 rounded-lg border border-slate-200/80 bg-slate-50/50 px-3.5 py-2.5 shadow-sm shadow-slate-900/5 dark:border-slate-600/50 dark:bg-slate-800/30 dark:shadow-none ${className}`
       }
     >
-      <div className="min-w-0 flex-1 pt-0.5">
+      <div className={`min-w-0 flex-1 ${description ? 'pt-0.5' : ''}`}>
         <label
           htmlFor={id}
-          className={`text-sm font-medium text-slate-800 ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+          className={`text-sm font-medium text-slate-700 dark:text-slate-300 ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
         >
           {label}
         </label>
-        {description ? <p className="mt-1 text-xs leading-relaxed text-slate-500">{description}</p> : null}
+        {description ? (
+          <p className="mt-0.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{description}</p>
+        ) : null}
       </div>
-      <button
-        id={id}
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        disabled={disabled}
-        {...rest}
-        onClick={() => !disabled && onCheckedChange(!checked)}
-        className={`
-          relative inline-flex h-7 w-11 shrink-0 cursor-pointer rounded-full border border-slate-300/40 transition-colors duration-200
-          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2
-          disabled:cursor-not-allowed disabled:opacity-45
-          ${checked ? 'border-slate-800 bg-slate-800' : 'bg-slate-200'}
-        `}
-      >
-        <span
-          aria-hidden
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        {showStatusPill ? (
+          <span
+            className={`min-w-[4.25rem] rounded-full px-2.5 py-1 text-center text-xs font-semibold tabular-nums transition-colors ${
+              checked
+                ? 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-600/15 dark:bg-emerald-950/55 dark:text-emerald-300 dark:ring-emerald-500/25'
+                : 'bg-slate-200/90 text-slate-600 ring-1 ring-slate-400/20 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-600/40'
+            }`}
+          >
+            {checked ? statusOnText : statusOffText}
+          </span>
+        ) : null}
+        <button
+          id={id}
+          type="button"
+          role="switch"
+          aria-checked={checked}
+          disabled={disabled}
+          {...rest}
+          onClick={() => !disabled && onCheckedChange(!checked)}
           className={`
-            pointer-events-none absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow-md ring-1 ring-slate-900/5 transition-transform duration-200 ease-out
-            ${checked ? 'translate-x-[22px]' : 'translate-x-0'}
+          relative inline-flex h-7 w-11 shrink-0 cursor-pointer rounded-full border transition-colors duration-200
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900
+          disabled:cursor-not-allowed disabled:opacity-45
+          ${
+            checked
+              ? showStatusPill
+                ? 'border-emerald-600 bg-emerald-600 dark:border-emerald-500 dark:bg-emerald-500'
+                : 'border-slate-700 bg-slate-800 dark:border-slate-500/40 dark:bg-slate-200'
+              : 'border-slate-300/60 bg-slate-200 dark:border-slate-600 dark:bg-slate-700/80'
+          }
+        `}
+        >
+          <span
+            aria-hidden
+            className={`
+            pointer-events-none absolute left-0.5 top-0.5 size-5 rounded-full shadow-sm ring-1 transition-transform duration-200 ease-out
+            ${
+              checked
+                ? showStatusPill
+                  ? 'translate-x-[22px] bg-white ring-emerald-900/10'
+                  : 'translate-x-[22px] bg-white ring-slate-900/10 dark:bg-slate-900 dark:ring-white/10'
+                : 'translate-x-0 bg-white ring-slate-900/5 dark:bg-slate-300 dark:ring-slate-900/20'
+            }
           `}
-        />
-      </button>
+          />
+        </button>
+      </div>
     </div>
   )
 }

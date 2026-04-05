@@ -84,6 +84,7 @@ def _pode_enviar_mensagem_publica(atendente: Atendente, ticket: Ticket) -> bool:
 @router.get("", response_model=ListaPaginada[TicketRead])
 def listar(
     empresa_id: int | None = Query(None),
+    rede_id: int | None = Query(None, description="Tickets de empresas desta rede"),
     setor_id: int | None = Query(None),
     status_id: int | None = Query(None),
     protocolo: str | None = Query(None, description="Legado: use busca"),
@@ -116,6 +117,8 @@ def listar(
         q = q.filter(Ticket.setor_id.in_(vis))
     if empresa_id is not None:
         q = q.filter(Ticket.empresa_id == empresa_id)
+    if rede_id is not None:
+        q = q.filter(Empresa.rede_id == rede_id)
     if setor_id is not None:
         q = q.filter(Ticket.setor_id == setor_id)
     if status_id is not None:

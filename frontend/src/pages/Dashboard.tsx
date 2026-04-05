@@ -6,14 +6,17 @@ import { dashboard } from '../api/client'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { IconEye } from '../components/ui/IconEye'
+import { useToast } from '../components/ui/Toast'
 
 type ColunaUltimos = 'protocolo' | 'empresa' | 'assunto' | 'status'
 
 export function Dashboard() {
+  const toast = useToast()
   const { ordenarPor, ordem, aoOrdenarColuna } = useOrdenacaoLista<ColunaUltimos>()
   const [data, setData] = useState<Awaited<ReturnType<typeof dashboard.get>> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     setLoading(true)
@@ -21,27 +24,16 @@ export function Dashboard() {
     dashboard
       .get()
       .then(setData)
-      .catch((err) => setError(err instanceof Error ? err.message : 'Erro ao carregar'))
+      .catch((err) => {
+        const msg = err instanceof Error ? err.message : 'Erro ao carregar'
+        setError(msg)
+        toast.showError(msg)
+      })
       .finally(() => setLoading(false))
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- recarrega só quando reloadKey muda
+  }, [reloadKey])
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <span className="text-slate-500 dark:text-slate-400">Carregando dashboard...</span>
-      </div>
-    )
-  }
-
-  if (error || !data) {
-    return (
-      <div className="rounded-lg bg-red-50 p-4 text-red-700">
-        {error ?? 'Dados não disponíveis.'}
-      </div>
-    )
-  }
-
-  const { resumo, ultimos_tickets } = data
+  const ultimos_tickets = data?.ultimos_tickets ?? []
 
   const ultimosOrdenados = useMemo(() => {
     if (!ordenarPor) return ultimos_tickets
@@ -59,6 +51,29 @@ export function Dashboard() {
     })
     return rows
   }, [ultimos_tickets, ordenarPor, ordem])
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <span className="text-slate-500 dark:text-slate-400">Carregando dashboard...</span>
+      </div>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4 px-4">
+        <p className="max-w-md text-center text-slate-600 dark:text-slate-400">
+          {error ?? 'Dados não disponíveis.'}
+        </p>
+        <Button type="button" onClick={() => setReloadKey((k) => k + 1)}>
+          Tentar novamente
+        </Button>
+      </div>
+    )
+  }
+
+  const { resumo } = data
 
   return (
     <div className="space-y-6">

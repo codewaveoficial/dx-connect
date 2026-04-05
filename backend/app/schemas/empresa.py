@@ -19,6 +19,22 @@ class EmpresaBase(BaseModel):
     cep: str | None = None
     email: str | None = None
     telefone: str | None = None
+    resp_legal_nome: str | None = None
+    resp_legal_cpf: str | None = None
+    resp_legal_rg: str | None = None
+    resp_legal_orgao_emissor: str | None = None
+    resp_legal_nacionalidade: str | None = None
+    resp_legal_estado_civil: str | None = None
+    resp_legal_cargo: str | None = None
+    resp_legal_email: str | None = None
+    resp_legal_telefone: str | None = None
+    resp_legal_endereco: str | None = None
+    resp_legal_numero: str | None = None
+    resp_legal_complemento: str | None = None
+    resp_legal_bairro: str | None = None
+    resp_legal_cidade: str | None = None
+    resp_legal_estado: str | None = None
+    resp_legal_cep: str | None = None
     ativo: bool = True
 
 
@@ -43,6 +59,22 @@ class EmpresaUpdate(BaseModel):
     cep: str | None = None
     email: str | None = None
     telefone: str | None = None
+    resp_legal_nome: str | None = None
+    resp_legal_cpf: str | None = None
+    resp_legal_rg: str | None = None
+    resp_legal_orgao_emissor: str | None = None
+    resp_legal_nacionalidade: str | None = None
+    resp_legal_estado_civil: str | None = None
+    resp_legal_cargo: str | None = None
+    resp_legal_email: str | None = None
+    resp_legal_telefone: str | None = None
+    resp_legal_endereco: str | None = None
+    resp_legal_numero: str | None = None
+    resp_legal_complemento: str | None = None
+    resp_legal_bairro: str | None = None
+    resp_legal_cidade: str | None = None
+    resp_legal_estado: str | None = None
+    resp_legal_cep: str | None = None
     ativo: bool | None = None
 
 

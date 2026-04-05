@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     # Origens CORS separadas por vírgula (ex.: https://app.exemplo.com,https://www.exemplo.com)
     CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
     LOG_LEVEL: str = "INFO"
+    # Cache de municípios (IBGE): intervalo entre verificações em background e idade máxima antes de re-sync completo.
+    IBGE_MUNICIPIOS_SYNC_INTERVAL_SECONDS: int = 86400
+    IBGE_MUNICIPIOS_MAX_AGE_HOURS: int = 168
 
     @field_validator("LOG_LEVEL")
     @classmethod

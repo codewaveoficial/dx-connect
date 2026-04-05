@@ -9,11 +9,13 @@ import { SelectComPesquisa } from '../components/ui/SelectComPesquisa'
 import { Select } from '../components/ui/Select'
 import { useToast } from '../components/ui/Toast'
 import { useAuth } from '../contexts/AuthContext'
+import { useVoltarAnterior } from '../hooks/useVoltarAnterior'
 
 export function TicketNovo() {
   const { isAdmin, user } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
+  const voltarAnterior = useVoltarAnterior('/tickets')
 
   const [empresasList, setEmpresasList] = useState<Empresas.Empresa[]>([])
   const [setoresList, setSetoresList] = useState<Setores.Setor[]>([])
@@ -22,7 +24,6 @@ export function TicketNovo() {
   const [assunto, setAssunto] = useState('')
   const [descricao, setDescricao] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
 
   const setorIdsPermitidos = useMemo(() => {
     if (isAdmin) return null
@@ -64,14 +65,13 @@ export function TicketNovo() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!empresaId || !setorId || !assunto.trim() || !descricao.trim()) {
-      setError('Preencha empresa, setor, assunto e o relato do problema.')
+      toast.showWarning('Preencha empresa, setor, assunto e o relato do problema.')
       return
     }
     if (!isAdmin && !setorIdsPermitidos?.has(Number(setorId))) {
-      setError('Selecione um setor ao qual você tenha acesso.')
+      toast.showWarning('Selecione um setor ao qual você tenha acesso.')
       return
     }
-    setError('')
     setLoading(true)
     try {
       const created = await tickets.create({
@@ -84,8 +84,7 @@ export function TicketNovo() {
       navigate(`/tickets/${created.id}`)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro ao criar ticket'
-      setError(msg)
-      toast.showWarning(msg)
+      toast.showError(msg)
     } finally {
       setLoading(false)
     }
@@ -98,10 +97,10 @@ export function TicketNovo() {
       <nav aria-label="breadcrumb" className="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
         <button
           type="button"
-          onClick={() => navigate('/tickets')}
+          onClick={voltarAnterior}
           className="font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
         >
-          Tickets
+          ← Voltar
         </button>
         <span aria-hidden className="text-slate-300 dark:text-slate-600">
           /
@@ -124,12 +123,6 @@ export function TicketNovo() {
           <strong>Atribuir a mim</strong> para assumir o atendimento.
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
-              {error}
-            </div>
-          )}
-
           <SelectComPesquisa
             id="ticket-empresa"
             label="Empresa *"
@@ -185,7 +178,7 @@ export function TicketNovo() {
             <Button type="submit" loading={loading} disabled={semSetorPermitido}>
               Criar ticket
             </Button>
-            <Button type="button" variant="secondary" onClick={() => navigate('/tickets')}>
+            <Button type="button" variant="secondary" onClick={voltarAnterior}>
               Cancelar
             </Button>
           </div>

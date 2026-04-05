@@ -12,12 +12,14 @@ import { BarraBuscaPaginacao, PAGE_SIZE_PADRAO } from '../components/ui/BarraBus
 import { Switch } from '../components/ui/Switch'
 import { CheckboxField } from '../components/ui/CheckboxField'
 import { Select } from '../components/ui/Select'
+import { useToast } from '../components/ui/Toast'
 
 type ColunaAtendente = 'nome' | 'email' | 'role'
 
 const roleLabel: Record<string, string> = { admin: 'Administrador', atendente: 'Atendente' }
 
 export function Atendentes() {
+  const toast = useToast()
   const { ordenarPor, ordem, aoOrdenarColuna, sortParams } = useOrdenacaoLista<ColunaAtendente>()
   const [list, setList] = useState<Atendentes.Atendente[]>([])
   const [total, setTotal] = useState(0)
@@ -26,7 +28,6 @@ export function Atendentes() {
   const [debouncedBusca, setDebouncedBusca] = useState('')
   const [setoresList, setSetoresList] = useState<Setores.Setor[]>([])
   const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState('')
   const [incluirInativos, setIncluirInativos] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -37,7 +38,6 @@ export function Atendentes() {
   const [ativo, setAtivo] = useState(true)
   const [setorIds, setSetorIds] = useState<number[]>([])
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedBusca(busca.trim()), 400)
@@ -50,7 +50,6 @@ export function Atendentes() {
 
   function load() {
     setLoading(true)
-    setLoadError('')
     atendentes
       .list({
         incluir_inativos: incluirInativos,
@@ -66,7 +65,7 @@ export function Atendentes() {
       .catch((err) => {
         setList([])
         setTotal(0)
-        setLoadError(err instanceof Error ? err.message : 'Erro ao carregar atendentes')
+        toast.showError(err instanceof Error ? err.message : 'Erro ao carregar atendentes')
       })
       .finally(() => setLoading(false))
   }
@@ -89,7 +88,6 @@ export function Atendentes() {
     setRole('atendente')
     setAtivo(true)
     setSetorIds([])
-    setError('')
     setModalOpen(true)
   }
 
@@ -101,7 +99,6 @@ export function Atendentes() {
     setRole((item.role as 'admin') || 'atendente')
     setAtivo(item.ativo)
     setSetorIds(item.setor_ids ?? [])
-    setError('')
     setModalOpen(true)
   }
 
@@ -111,7 +108,6 @@ export function Atendentes() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError('')
     setSaving(true)
     try {
       if (editingId) {
@@ -134,10 +130,11 @@ export function Atendentes() {
           ativo,
         })
       }
+      toast.showSuccess(editingId ? 'Atendente atualizado.' : 'Atendente cadastrado.')
       setModalOpen(false)
       load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro')
+      toast.showError(err instanceof Error ? err.message : 'Erro')
     } finally {
       setSaving(false)
     }
@@ -161,11 +158,6 @@ export function Atendentes() {
             disabled={loading}
             extra={<FiltroInativos incluirInativos={incluirInativos} onChange={setIncluirInativos} />}
           />
-        {loadError && (
-          <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800/60 dark:bg-red-950/40 dark:text-red-200">
-            {loadError}
-          </div>
-        )}
         {loading ? (
           <p className="text-slate-500 dark:text-slate-400">Carregando...</p>
         ) : list.length === 0 ? (
@@ -231,7 +223,6 @@ export function Atendentes() {
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4">
           <Card title={editingId ? 'Editar atendente' : 'Novo atendente'} className="w-full max-w-md">
             <form onSubmit={handleSubmit} className="space-y-4">
-              {error && <div className="rounded bg-red-50 p-2 text-sm text-red-700">{error}</div>}
               <Input label="E-mail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               <Input label="Nome" value={nome} onChange={(e) => setNome(e.target.value)} required />
               <Input

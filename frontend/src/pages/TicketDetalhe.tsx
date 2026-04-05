@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { tickets, statusTicket, atendentes, setores, type StatusTicket, type Atendentes, type Setores, type Tickets } from '../api/client'
 import { coletarTodasPaginas } from '../api/collectPages'
 import { Card } from '../components/ui/Card'
@@ -7,6 +7,7 @@ import { Select } from '../components/ui/Select'
 import { Button } from '../components/ui/Button'
 import { useToast } from '../components/ui/Toast'
 import { useAuth } from '../contexts/AuthContext'
+import { useVoltarAnterior } from '../hooks/useVoltarAnterior'
 
 const ROTULO_CAMPO: Record<string, string> = {
   status_id: 'Status',
@@ -86,7 +87,7 @@ function dedupeAtendentesMesmoNome(
 
 export function TicketDetalhe() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
+  const voltarAnterior = useVoltarAnterior('/tickets')
   const toast = useToast()
   const { isAdmin, user } = useAuth()
   const [atribuindo, setAtribuindo] = useState(false)
@@ -449,9 +450,13 @@ export function TicketDetalhe() {
     return (
       <div className="space-y-4">
         <p className="text-slate-600 dark:text-slate-400">Ticket não encontrado ou sem permissão.</p>
-        <Link to="/tickets" className="font-medium text-slate-800 underline dark:text-slate-200">
-          Voltar para tickets
-        </Link>
+        <button
+          type="button"
+          onClick={voltarAnterior}
+          className="font-medium text-slate-800 underline decoration-slate-400 underline-offset-2 hover:text-slate-950 dark:text-slate-200 dark:hover:text-white"
+        >
+          Voltar
+        </button>
       </div>
     )
   }
@@ -459,9 +464,13 @@ export function TicketDetalhe() {
   return (
     <div className="space-y-6">
       <nav aria-label="breadcrumb" className="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-        <Link to="/tickets" className="font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100">
-          Tickets
-        </Link>
+        <button
+          type="button"
+          onClick={voltarAnterior}
+          className="font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+        >
+          ← Voltar
+        </button>
         <span aria-hidden className="text-slate-300 dark:text-slate-600">
           /
         </span>
@@ -536,7 +545,7 @@ export function TicketDetalhe() {
           <Button type="button" variant="secondary" onClick={() => abrirModalGerir('geral')}>
             Gerir ticket
           </Button>
-          <Button variant="secondary" onClick={() => navigate('/tickets')}>
+          <Button variant="secondary" onClick={voltarAnterior}>
             Voltar
           </Button>
         </div>

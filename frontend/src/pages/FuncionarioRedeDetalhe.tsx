@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { funcionariosRede, redes, empresas, type FuncionariosRede } from '../api/client'
 import { Button } from '../components/ui/Button'
 import { useToast } from '../components/ui/Toast'
+import { useVoltarAnterior } from '../hooks/useVoltarAnterior'
 
 const tipoLabel: Record<string, string> = {
   socio: 'Sócio',
@@ -20,15 +21,12 @@ function DetailRow({ label, value }: { label: string; value: string | null | und
   )
 }
 
-type VoltarState = { voltarRedeId?: number }
-
 export function FuncionarioRedeDetalhe() {
   const { id } = useParams<{ id: string }>()
-  const location = useLocation()
   const navigate = useNavigate()
+  const voltarAnterior = useVoltarAnterior('/funcionarios-rede')
   const toast = useToast()
   const funcionarioId = id ? parseInt(id, 10) : NaN
-  const voltarRedeId = (location.state as VoltarState | null)?.voltarRedeId
 
   const [f, setF] = useState<FuncionariosRede.Funcionario | null>(null)
   const [redeNome, setRedeNome] = useState('')
@@ -145,8 +143,8 @@ export function FuncionarioRedeDetalhe() {
   useEffect(() => {
     if (!loadError || loading) return
     toast.showWarning('Funcionário não encontrado.')
-    navigate(voltarRedeId != null ? `/redes/${voltarRedeId}` : '/funcionarios-rede', { replace: true })
-  }, [loadError, loading, navigate, toast, voltarRedeId])
+    voltarAnterior()
+  }, [loadError, loading, toast, voltarAnterior])
 
   function abrirEdicao() {
     if (!f) return
@@ -158,14 +156,11 @@ export function FuncionarioRedeDetalhe() {
     try {
       await funcionariosRede.delete(f.id)
       toast.showSuccess('Funcionário excluído.')
-      navigate(voltarRedeId != null ? `/redes/${voltarRedeId}` : '/funcionarios-rede', { replace: true })
+      voltarAnterior()
     } catch (err) {
       toast.showWarning(err instanceof Error ? err.message : 'Não foi possível excluir.')
     }
   }
-
-  const voltarHref = voltarRedeId != null ? `/redes/${voltarRedeId}` : '/funcionarios-rede'
-  const voltarLabel = voltarRedeId != null ? 'Voltar à rede' : 'Funcionários da rede'
 
   if (loading) {
     return (
@@ -190,12 +185,13 @@ export function FuncionarioRedeDetalhe() {
   return (
     <div className="mx-auto max-w-3xl space-y-8 pb-10">
       <div>
-        <Link
-          to={voltarHref}
-          className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 transition-colors hover:text-slate-800"
+        <button
+          type="button"
+          onClick={voltarAnterior}
+          className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 transition-colors hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
         >
-          <span aria-hidden>←</span> {voltarLabel}
-        </Link>
+          <span aria-hidden>←</span> Voltar
+        </button>
       </div>
 
       <header className="space-y-3">
@@ -215,7 +211,7 @@ export function FuncionarioRedeDetalhe() {
             </div>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
-            <Button variant="secondary" onClick={() => navigate(voltarHref)}>
+            <Button variant="secondary" onClick={voltarAnterior}>
               Voltar
             </Button>
             <Button onClick={abrirEdicao}>Editar</Button>

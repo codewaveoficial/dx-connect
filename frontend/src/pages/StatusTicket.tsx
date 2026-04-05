@@ -9,10 +9,12 @@ import { IconPencil } from '../components/ui/IconPencil'
 import { FiltroInativos } from '../components/ui/FiltroInativos'
 import { BarraBuscaPaginacao, PAGE_SIZE_PADRAO } from '../components/ui/BarraBuscaPaginacao'
 import { Switch } from '../components/ui/Switch'
+import { useToast } from '../components/ui/Toast'
 
 type ColunaStatus = 'nome' | 'slug' | 'ordem' | 'ativo'
 
 export function StatusTicketPage() {
+  const toast = useToast()
   const { ordenarPor, ordem: ordemLista, aoOrdenarColuna, sortParams } = useOrdenacaoLista<ColunaStatus>()
   const [list, setList] = useState<StatusTicket.Status[]>([])
   const [total, setTotal] = useState(0)
@@ -28,7 +30,6 @@ export function StatusTicketPage() {
   const [ordem, setOrdem] = useState(0)
   const [ativo, setAtivo] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedBusca(busca.trim()), 400)
@@ -66,7 +67,6 @@ export function StatusTicketPage() {
     setSlug('')
     setOrdem(total)
     setAtivo(true)
-    setError('')
     setModalOpen(true)
   }
 
@@ -76,24 +76,24 @@ export function StatusTicketPage() {
     setSlug(item.slug)
     setOrdem(item.ordem)
     setAtivo(item.ativo)
-    setError('')
     setModalOpen(true)
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError('')
     setSaving(true)
     try {
       if (editingId) {
         await statusTicket.update(editingId, { nome: nome.trim(), slug: slug.trim(), ordem, ativo })
+        toast.showSuccess('Status atualizado.')
       } else {
         await statusTicket.create({ nome: nome.trim(), slug: slug.trim(), ordem, ativo })
+        toast.showSuccess('Status cadastrado.')
       }
       setModalOpen(false)
       load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro')
+      toast.showError(err instanceof Error ? err.message : 'Erro')
     } finally {
       setSaving(false)
     }
@@ -180,7 +180,6 @@ export function StatusTicketPage() {
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4">
           <Card title={editingId ? 'Editar status' : 'Novo status'} className="w-full max-w-md">
             <form onSubmit={handleSubmit} className="space-y-4">
-              {error && <div className="rounded bg-red-50 p-2 text-sm text-red-700">{error}</div>}
               <Input label="Nome" value={nome} onChange={(e) => setNome(e.target.value)} required />
               <Input label="Slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="ex: aberto" required />
               <Input label="Ordem" type="number" value={ordem} onChange={(e) => setOrdem(Number(e.target.value))} />
