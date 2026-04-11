@@ -1,7 +1,7 @@
 """add tipo_negocio_id to empresas
 
 Revision ID: 001_tipo_negocio
-Revises:
+Revises: 000_initial_schema
 Create Date: add column tipo_negocio_id to empresas
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = "001_tipo_negocio"
-down_revision = None
+down_revision = "000_initial_schema"
 branch_labels = None
 depends_on = None
 
