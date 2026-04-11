@@ -20,7 +20,7 @@ depends_on = None
 def upgrade() -> None:
     op.create_table(
         "redes",
-        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("nome", sa.String(length=255), nullable=False),
         sa.Column("ativo", sa.Boolean(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True),
@@ -31,7 +31,7 @@ def upgrade() -> None:
 
     op.create_table(
         "tipos_negocio",
-        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("nome", sa.String(length=100), nullable=False),
         sa.Column("ativo", sa.Boolean(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True),
@@ -42,7 +42,7 @@ def upgrade() -> None:
 
     op.create_table(
         "empresas",
-        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("rede_id", sa.Integer(), nullable=False),
         sa.Column("nome", sa.String(length=255), nullable=False),
         sa.Column("cnpj_cpf", sa.String(length=18), nullable=True),
@@ -69,7 +69,7 @@ def upgrade() -> None:
 
     op.create_table(
         "setores",
-        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("nome", sa.String(length=100), nullable=False),
         sa.Column("slug", sa.String(length=50), nullable=False),
         sa.Column("ativo", sa.Boolean(), nullable=True),
@@ -82,7 +82,7 @@ def upgrade() -> None:
 
     op.create_table(
         "atendentes",
-        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("email", sa.String(length=255), nullable=False),
         sa.Column("senha_hash", sa.String(length=255), nullable=False),
         sa.Column("nome", sa.String(length=255), nullable=False),
@@ -106,7 +106,7 @@ def upgrade() -> None:
 
     op.create_table(
         "status_ticket",
-        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("nome", sa.String(length=100), nullable=False),
         sa.Column("slug", sa.String(length=50), nullable=False),
         sa.Column("ordem", sa.SmallInteger(), nullable=True),
@@ -120,7 +120,7 @@ def upgrade() -> None:
 
     op.create_table(
         "funcionarios_rede",
-        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("nome", sa.String(length=255), nullable=False),
         sa.Column("email", sa.String(length=255), nullable=False),
         sa.Column("tipo", sa.String(length=20), nullable=False),
@@ -138,7 +138,7 @@ def upgrade() -> None:
 
     op.create_table(
         "funcionario_rede_empresa",
-        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("funcionario_id", sa.Integer(), nullable=False),
         sa.Column("empresa_id", sa.Integer(), nullable=False),
         sa.ForeignKeyConstraint(["empresa_id"], ["empresas.id"], ondelete="CASCADE"),
@@ -149,7 +149,7 @@ def upgrade() -> None:
 
     op.create_table(
         "tickets",
-        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("protocolo", sa.String(length=20), nullable=False),
         sa.Column("empresa_id", sa.Integer(), nullable=False),
         sa.Column("setor_id", sa.Integer(), nullable=False),
@@ -173,7 +173,7 @@ def upgrade() -> None:
 
     op.create_table(
         "ticket_mensagens",
-        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("ticket_id", sa.Integer(), nullable=False),
         sa.Column("atendente_id", sa.Integer(), nullable=True),
         sa.Column("tipo", sa.String(length=20), nullable=False),
@@ -188,7 +188,7 @@ def upgrade() -> None:
 
     op.create_table(
         "ticket_historico",
-        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("ticket_id", sa.Integer(), nullable=False),
         sa.Column("atendente_id", sa.Integer(), nullable=True),
         sa.Column("campo", sa.String(length=50), nullable=False),
@@ -203,7 +203,7 @@ def upgrade() -> None:
 
     op.create_table(
         "audit_log",
-        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("entity_type", sa.String(length=50), nullable=False),
         sa.Column("entity_id", sa.Integer(), nullable=False),
         sa.Column("action", sa.String(length=20), nullable=False),
