@@ -1,7 +1,7 @@
 # python-multipart não é necessário: rotas usam JSON (Body), não Form()/upload.
 # Se no futuro houver formulários ou upload de ficheiros, adicionar: python-multipart==...
 fastapi==0.115.5
-uvicorn[standard]==0.32.1
+uvicorn[standard]==0.44.0
 gunicorn==23.0.0
 sqlalchemy==2.0.36
 psycopg2-binary==2.9.10
