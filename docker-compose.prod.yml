@@ -1,11 +1,15 @@
-# Backend apontando para PostgreSQL externo (ex.: Hostinger).
+# Backend apontando para PostgreSQL no MESMO host (ex.: Postgres instalado no VPS, não no Docker).
+# network_mode: host (Linux): o container usa a rede do host, assim DATABASE_URL com 127.0.0.1:5432
+# aponta para o Postgres do host. Sem isso, 127.0.0.1 dentro do container é o próprio container → connection refused.
+# GUNICORN_BIND=127.0.0.1:8000 mantém a API só em loopback (equivalente ao antigo ports: 127.0.0.1:8000:8000).
+#
 # Uso: docker compose -f docker-compose.prod.yml up -d --build
 # Configure backend/.env: DATABASE_URL (?sslmode=require), SECRET_KEY (32+), CORS_ORIGINS, ALLOWED_HOSTS,
 # ACCESS_TOKEN_EXPIRE_MINUTES=30, ENVIRONMENT=production. Opcional: GUNICORN_FORWARDED_ALLOW_IPS se o proxy não for 127.0.0.1.
 #
 # Antes do primeiro up (ou após nova migration): aplicar schema no PostgreSQL, ex.:
 #   docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
-# Seed / admin inicial (opcional, uma vez): defina SEED_ADMIN_PASSWORD no .env e:
+# Seed / admin inicial (opcional): em produção defina SEED_ADMIN_EMAIL e SEED_ADMIN_PASSWORD (mín. 8) e:
 #   docker compose -f docker-compose.prod.yml exec backend python -m app.seed
 
 services:
@@ -18,7 +22,6 @@ services:
       - ./backend/.env
     environment:
       ENVIRONMENT: production
-    # Só localhost: use com Nginx no mesmo VPS (proxy para 127.0.0.1:8000). Para testar API sem Nginx, troque por "8000:8000".
-    ports:
-      - "127.0.0.1:8000:8000"
+      GUNICORN_BIND: "127.0.0.1:8000"
+    network_mode: host
     restart: unless-stopped

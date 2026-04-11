@@ -1,7 +1,7 @@
 import re
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import EmailStr, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,12 +30,20 @@ class Settings(BaseSettings):
     # Cache de municípios (IBGE): intervalo entre verificações em background e idade máxima antes de re-sync completo.
     IBGE_MUNICIPIOS_SYNC_INTERVAL_SECONDS: int = 86400
     IBGE_MUNICIPIOS_MAX_AGE_HOURS: int = 168
-    # Seed em produção: se definido, cria admin@email.com com esta senha e must_change_password=true.
-    # Sem isso, run_seed não cria usuário admin padrão em ENVIRONMENT=production.
+    # Seed em produção: só cria o primeiro admin se AMBOS estiverem definidos (senha mín. 8 caracteres).
+    # Sem SEED_ADMIN_EMAIL, nenhum admin é criado automaticamente em produção.
+    SEED_ADMIN_EMAIL: EmailStr | None = None
     SEED_ADMIN_PASSWORD: str | None = None
     # Hostnames permitidos no header Host (TrustedHostMiddleware). Em produção não use "*".
     # Ex.: api.seudominio.com,127.0.0.1
     ALLOWED_HOSTS: str = "*"
+
+    @field_validator("SEED_ADMIN_EMAIL", mode="before")
+    @classmethod
+    def normalize_seed_admin_email(cls, v):
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        return v
 
     @field_validator("LOG_LEVEL")
     @classmethod

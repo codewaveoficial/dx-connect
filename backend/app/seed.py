@@ -50,52 +50,57 @@ def run_seed():
         else:
             _ensure_status_aguardando_atendimento(db)
 
-        if db.query(Atendente).filter(func.lower(Atendente.email) == "admin@email.com").count() == 0:
-            if settings.is_production:
-                pwd = (settings.SEED_ADMIN_PASSWORD or "").strip()
-                if len(pwd) < 8:
-                    print(
-                        "Produção: admin inicial não criado. Defina SEED_ADMIN_PASSWORD (mín. 8 caracteres) "
-                        "no ambiente ou crie o administrador pelo painel após o primeiro deploy."
-                    )
-                else:
-                    db.add(
-                        Atendente(
-                            email="admin@email.com",
-                            nome="Administrador",
-                            senha_hash=_hash_senha(pwd),
-                            role="admin",
-                            ativo=True,
-                            must_change_password=True,
-                        )
-                    )
-                    db.commit()
-                    print(
-                        "Usuário admin criado: admin@email.com — troque a senha no primeiro acesso "
-                        "(must_change_password ativo)."
-                    )
-            else:
+        if settings.is_production:
+            seed_email = (str(settings.SEED_ADMIN_EMAIL) if settings.SEED_ADMIN_EMAIL else "").strip().lower()
+            pwd = (settings.SEED_ADMIN_PASSWORD or "").strip()
+            if not seed_email:
+                print(
+                    "Produção: admin inicial não criado. Defina SEED_ADMIN_EMAIL e SEED_ADMIN_PASSWORD "
+                    "(mín. 8 caracteres) no ambiente, ou crie o administrador pelo painel após o deploy."
+                )
+            elif len(pwd) < 8:
+                print(
+                    "Produção: admin inicial não criado. SEED_ADMIN_PASSWORD deve ter ao menos 8 caracteres."
+                )
+            elif not db.query(Atendente).filter(func.lower(Atendente.email) == seed_email).first():
                 db.add(
                     Atendente(
-                        email="admin@email.com",
+                        email=seed_email,
                         nome="Administrador",
-                        senha_hash=_hash_senha("admin123"),
+                        senha_hash=_hash_senha(pwd),
                         role="admin",
                         ativo=True,
-                        must_change_password=False,
+                        must_change_password=True,
                     )
                 )
                 db.commit()
-                print("Usuário admin criado (desenvolvimento): admin@email.com / admin123 — não use em produção.")
+                print(
+                    f"Usuário admin criado: {seed_email} — troque a senha no primeiro acesso "
+                    "(must_change_password ativo)."
+                )
+        elif not db.query(Atendente).filter(func.lower(Atendente.email) == "admin@email.com").first():
+            db.add(
+                Atendente(
+                    email="admin@email.com",
+                    nome="Administrador",
+                    senha_hash=_hash_senha("admin123"),
+                    role="admin",
+                    ativo=True,
+                    must_change_password=False,
+                )
+            )
+            db.commit()
+            print("Usuário admin criado (desenvolvimento): admin@email.com / admin123 — não use em produção.")
     finally:
         db.close()
 
 
-def reset_senha_admin_padrao(senha: str = "admin123") -> bool:
-    """Redefine a senha do usuário admin@email.com (útil após volume antigo ou seed falho)."""
+def reset_senha_admin_padrao(senha: str = "admin123", email: str = "admin@email.com") -> bool:
+    """Redefine a senha do atendente com o e-mail indicado (padrão: admin@email.com)."""
+    target = email.strip().lower()
     db = SessionLocal()
     try:
-        a = db.query(Atendente).filter(func.lower(Atendente.email) == "admin@email.com").first()
+        a = db.query(Atendente).filter(func.lower(Atendente.email) == target).first()
         if not a:
             return False
         a.senha_hash = _hash_senha(senha)
@@ -109,7 +114,12 @@ if __name__ == "__main__":
     import sys
 
     if "--reset-admin" in sys.argv:
-        ok = reset_senha_admin_padrao()
-        print("Senha do admin redefinida." if ok else "Nenhum admin@email.com encontrado.")
+        i = sys.argv.index("--reset-admin")
+        extra = sys.argv[i + 1] if len(sys.argv) > i + 1 and not sys.argv[i + 1].startswith("--") else None
+        email_reset = extra if extra and "@" in extra else "admin@email.com"
+        ok = reset_senha_admin_padrao(email=email_reset)
+        print(
+            "Senha do admin redefinida." if ok else f"Nenhum atendente com e-mail {email_reset!r} encontrado."
+        )
     else:
         run_seed()
