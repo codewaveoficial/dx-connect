@@ -94,7 +94,7 @@ export function Empresas() {
   function load() {
     setLoading(true)
     apiEmpresas
-      .list({
+      .list<Empresas.Empresa>({
         incluir_inativos: incluirInativos,
         busca: debouncedBusca || undefined,
         ...sortParams,

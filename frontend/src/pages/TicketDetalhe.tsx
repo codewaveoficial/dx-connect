@@ -221,7 +221,7 @@ export function TicketDetalhe() {
     ).then(setSetoresList)
   }, [])
 
-  /** Só administradores podem listar /api/atendentes; depende de `user` para não rodar antes do /me. */
+  /** Só administradores podem listar atendentes; depende de `user` para não rodar antes do /me. */
   useEffect(() => {
     if (user?.role !== 'admin') {
       setAtendentesList([])

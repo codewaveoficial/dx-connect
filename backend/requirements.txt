@@ -1,3 +1,5 @@
+# python-multipart não é necessário: rotas usam JSON (Body), não Form()/upload.
+# Se no futuro houver formulários ou upload de ficheiros, adicionar: python-multipart==...
 fastapi==0.115.5
 uvicorn[standard]==0.32.1
 gunicorn==23.0.0
@@ -8,4 +10,3 @@ pydantic[email]==2.10.3
 pydantic-settings==2.6.1
 python-jose[cryptography]==3.3.0
 bcrypt>=4.0,<5
-python-multipart==0.0.17

@@ -29,3 +29,22 @@ Depois ative **HTTPS** (Certbot ou certificado do painel) e atualize `CORS_ORIGI
 ## Um domínio só (API + SPA)
 
 Se quiser tudo no mesmo `server_name`, pode servir o `dist/` em `/` e fazer `location /api/` com `proxy_pass` — **neste projeto** a API não usa o prefixo `/api` nas rotas, seria preciso alinhar `proxy_pass` e o `VITE_API_URL`. O arranjo mais simples é **dois nomes**: `app.` e `api.`.
+
+## Cabeçalhos de segurança (HTTPS + SPA)
+
+Checklist ao colocar o site em produção:
+
+1. **TLS**: redirecionar `80 → 443`; certificados válidos (ex.: Certbot).
+2. **HSTS** no `server` HTTPS: `add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;`
+3. **HTML estático** (`index.html` e assets): `Content-Security-Policy` alinhada ao que o bundle carrega (scripts, estilos, `connect-src` para a URL da API); `X-Frame-Options: DENY` ou `frame-ancestors 'none'` na CSP.
+4. **Complementar a API**: a aplicação FastAPI já envia `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` e `Strict-Transport-Security` quando `X-Forwarded-Proto` é `https` — o proxy deve repassar `X-Forwarded-Proto` e `X-Forwarded-For`.
+5. **Login (força bruta)**: além do limite na API, pode usar `limit_req` no Nginx em `POST` para `/auth/login` (ex.: `limit_req_zone` por `$binary_remote_addr`).
+
+Exemplo mínimo de bloco TLS + cabeçalhos no `server` do frontend (ajuste CSP ao seu build):
+
+```nginx
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-Frame-Options "DENY" always;
+add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+```

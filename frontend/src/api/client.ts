@@ -11,6 +11,9 @@ function apiBaseUrl(): string {
 
 const BASE = apiBaseUrl()
 
+/** Prefixo de versão da API (ex.: dev: `/api` + `/v1` + `/auth/login` → `/v1/auth/login` no backend). */
+export const API_VERSION_PREFIX = '/v1'
+
 const TOKEN_KEY = 'token'
 
 function getToken(): string | null {
@@ -38,7 +41,7 @@ export async function api<T>(
   if (token) {
     (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
   }
-  const res = await fetch(`${BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${BASE}${API_VERSION_PREFIX}${path}`, { ...options, headers });
 
   // Tratamento especial para login: não redirecionar nem recarregar a página,
   // apenas devolver a mensagem para o formulário exibir via toast.
@@ -66,7 +69,7 @@ export async function api<T>(
 
 export const auth = {
   login: (email: string, senha: string) =>
-    api<{ access_token: string }>('/auth/login', {
+    api<{ access_token: string; must_change_password?: boolean }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, senha }),
     }),
@@ -181,7 +184,8 @@ export const cadastroAux = {
 };
 
 export const empresas = {
-  list: (params?: {
+  /** Admin: tipar como Empresa. Atendente: omita o genérico (lista resumida). */
+  list: <T = Empresas.EmpresaListaItem>(params?: {
     rede_id?: number;
     incluir_inativos?: boolean;
     busca?: string;
@@ -189,7 +193,7 @@ export const empresas = {
     ordem?: 'asc' | 'desc';
     offset?: number;
     limit?: number;
-  }) => listPaginated<Empresas.Empresa>('/empresas', params),
+  }) => listPaginated<T>('/empresas', params),
   get: (id: number) => api<Empresas.Empresa>(`/empresas/${id}`),
   consultarCnpj: (cnpj: string) => api<Empresas.ConsultaCNPJ>(`/empresas/consultar-cnpj/${encodeURIComponent(cnpj.replace(/\D/g, ''))}`),
   create: (data: Empresas.Create) => api<Empresas.Empresa>('/empresas', { method: 'POST', body: JSON.stringify(data) }),
@@ -228,6 +232,11 @@ export const setores = {
 };
 
 export const atendentes = {
+  trocarSenha: (senhaAtual: string, senhaNova: string) =>
+    api<Atendentes.Atendente>('/atendentes/me/trocar-senha', {
+      method: 'POST',
+      body: JSON.stringify({ senha_atual: senhaAtual, senha_nova: senhaNova }),
+    }),
   list: (params?: {
     incluir_inativos?: boolean;
     busca?: string;
@@ -360,6 +369,16 @@ export namespace Redes {
 }
 
 export namespace Empresas {
+  /** Item de GET /empresas para atendentes (sem PII). */
+  export interface EmpresaListaResumo {
+    id: number;
+    nome: string;
+    ativo: boolean;
+    rede: { id: number; nome: string };
+  }
+  /** Lista: admin recebe Empresa completa; atendente recebe EmpresaListaResumo. */
+  export type EmpresaListaItem = Empresa | EmpresaListaResumo;
+
   export interface Empresa {
     id: number;
     rede_id: number;
@@ -531,6 +550,7 @@ export namespace Atendentes {
     role: string;
     ativo: boolean;
     setor_ids: number[];
+    must_change_password?: boolean;
   }
   export interface Create {
     email: string;

@@ -1,10 +1,12 @@
 # Backend apontando para PostgreSQL externo (ex.: Hostinger).
 # Uso: docker compose -f docker-compose.prod.yml up -d --build
-# Configure backend/.env com DATABASE_URL, SECRET_KEY (32+ chars), CORS_ORIGINS, ENVIRONMENT=production.
+# Configure backend/.env: DATABASE_URL (?sslmode=require), SECRET_KEY (32+), CORS_ORIGINS, ALLOWED_HOSTS,
+# ACCESS_TOKEN_EXPIRE_MINUTES=30, ENVIRONMENT=production. Opcional: GUNICORN_FORWARDED_ALLOW_IPS se o proxy não for 127.0.0.1.
 #
 # Antes do primeiro up (ou após nova migration): aplicar schema no PostgreSQL, ex.:
 #   docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
-# Seed / admin inicial (opcional, uma vez): docker compose -f docker-compose.prod.yml exec backend python -m app.seed
+# Seed / admin inicial (opcional, uma vez): defina SEED_ADMIN_PASSWORD no .env e:
+#   docker compose -f docker-compose.prod.yml exec backend python -m app.seed
 
 services:
   backend:

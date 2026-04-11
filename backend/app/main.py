@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api import auth, redes, empresas, setores, atendentes, funcionarios_rede, status_ticket, tickets, dashboard, audit, tipo_negocio, cadastro_aux
 from app.config import settings
@@ -147,6 +148,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Executado antes do CORS no pedido (último add_middleware = mais externo): valida header Host.
+_th = settings.allowed_hosts_list()
+if _th != ["*"]:
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=_th)
+
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    """Cabeçalhos básicos na API; em produção complemente no Nginx/CDN (HSTS, CSP no HTML estático)."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    if proto == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -157,18 +177,21 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Não foi possível concluir a ação. Tente novamente ou contate o suporte."},
     )
 
-app.include_router(auth.router)
-app.include_router(redes.router)
-app.include_router(empresas.router)
-app.include_router(setores.router)
-app.include_router(atendentes.router)
-app.include_router(funcionarios_rede.router)
-app.include_router(status_ticket.router)
-app.include_router(tickets.router)
-app.include_router(dashboard.router)
-app.include_router(audit.router)
-app.include_router(tipo_negocio.router)
-app.include_router(cadastro_aux.router)
+# Rotas versionadas (v2+ no futuro: outro prefix ou routers paralelos).
+API_V1_PREFIX = "/v1"
+
+app.include_router(auth.router, prefix=API_V1_PREFIX)
+app.include_router(redes.router, prefix=API_V1_PREFIX)
+app.include_router(empresas.router, prefix=API_V1_PREFIX)
+app.include_router(setores.router, prefix=API_V1_PREFIX)
+app.include_router(atendentes.router, prefix=API_V1_PREFIX)
+app.include_router(funcionarios_rede.router, prefix=API_V1_PREFIX)
+app.include_router(status_ticket.router, prefix=API_V1_PREFIX)
+app.include_router(tickets.router, prefix=API_V1_PREFIX)
+app.include_router(dashboard.router, prefix=API_V1_PREFIX)
+app.include_router(audit.router, prefix=API_V1_PREFIX)
+app.include_router(tipo_negocio.router, prefix=API_V1_PREFIX)
+app.include_router(cadastro_aux.router, prefix=API_V1_PREFIX)
 
 
 @app.get("/health")

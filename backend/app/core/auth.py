@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
@@ -8,8 +8,8 @@ from app.core.security import decodificar_token
 
 security = HTTPBearer(auto_error=False)
 
-
 def obter_atendente_atual(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: Session = Depends(get_db),
 ) -> Atendente:
@@ -32,6 +32,18 @@ def obter_atendente_atual(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuário não encontrado ou inativo",
         )
+    path = request.url.path.rstrip("/") or "/"
+    method = request.method.upper()
+    if getattr(atendente, "must_change_password", False):
+        # Rotas são montadas com prefixo (ex.: /v1/atendentes/me).
+        pode = (path.endswith("/atendentes/me") and method == "GET") or (
+            path.endswith("/atendentes/me/trocar-senha") and method == "POST"
+        )
+        if not pode:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Altere sua senha antes de usar o sistema.",
+            )
     return atendente
 
 

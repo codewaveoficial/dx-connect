@@ -16,9 +16,8 @@ Ferramenta interna de controle de tickets voltada para redes de postos/empresas,
 - **Autenticação e autorização**
   - Login de atendentes com JWT
   - Perfis: **admin** e **atendente**
-  - Primeiro usuário admin criado automaticamente pelo seed:
-    - E-mail: `admin@email.com`
-    - Senha: `admin123`
+  - Primeiro usuário admin criado pelo seed **em desenvolvimento** (`admin@email.com` / `admin123`). Em produção use `SEED_ADMIN_PASSWORD` no `.env` (mín. 8 caracteres) no `python -m app.seed`; a conta exige troca de senha no primeiro acesso.
+  - **Atenção:** essas credenciais são **apenas para ambiente local**. Não use em produção. Se o repositório for público ou for copiado (fork), trate-as como públicas — qualquer pessoa pode lê-las no README.
 
 - **Clientes**
   - **Redes**: cadastro de redes com visão detalhada
@@ -87,7 +86,7 @@ npm run dev
 
 O frontend ficará acessível em `http://localhost:5173`.
 
-3. **Login inicial**
+3. **Login inicial** (só desenvolvimento; ver nota de segurança acima)
 
 - Acesse `http://localhost:5173/login`
 - Use:
@@ -117,6 +116,12 @@ npm run dev
 ```bash
 npm run build
 ```
+
+### CI e rotina de segurança
+
+- Com repositório no **GitHub**: workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (`pip-audit`, `npm audit`, `compileall`, build do frontend) e [Dependabot](.github/dependabot.yml) para `pip`/`npm`/Docker/actions.
+- Localmente (antes de releases): `pip install pip-audit` e `pip-audit -r requirements.txt` na pasta `backend`; `npm audit` na pasta `frontend`.
+- Guia curto: [`docs/SECURITY_MAINTENANCE.md`](docs/SECURITY_MAINTENANCE.md).
 
 ### Licença
 
@@ -150,9 +155,9 @@ docker compose up -d
 
 No primeiro start, a API cria as tabelas e o seed: status de ticket e usuário admin.
 
-**Login padrão (após seed):**
-- E-mail: `admin@dxconnect.local`
-- Senha: `admin123`
+**Login padrão (após seed em desenvolvimento):**
+- E-mail: `admin@email.com`
+- Senha: `admin123` (não use em produção)
 
 ### 2. Frontend (local, com hot reload)
 
@@ -177,10 +182,11 @@ npm run dev
 ## Produção
 
 Checklist alinhado ao deploy (o que já está no código vs o que validar no servidor): [`docs/PRE_DEPLOY_CHECKLIST.md`](docs/PRE_DEPLOY_CHECKLIST.md).  
-Exemplos **Nginx** (HTTP, domínio → backend / estático): [`deploy/nginx/README.md`](deploy/nginx/README.md).
+Exemplos **Nginx** (HTTP, domínio → backend / estático) e checklist de **HSTS/CSP/limit_req**: [`deploy/nginx/README.md`](deploy/nginx/README.md).  
+**Deploy automático** (GitHub Actions → SSH → `rsync` do frontend + `git pull` + Alembic + Docker Compose): [`deploy/github-actions.md`](deploy/github-actions.md).
 
 **Backend (Docker, PostgreSQL externo)**  
-- Configure `backend/.env` (veja `backend/.env.example`): `DATABASE_URL`, `SECRET_KEY` (32+ caracteres), `CORS_ORIGINS` (origens HTTPS do frontend), `ENVIRONMENT=production`.  
+- Configure `backend/.env` (veja `backend/.env.example`): `DATABASE_URL` com `sslmode=require` (ou equivalente), `SECRET_KEY` (32+ caracteres), `CORS_ORIGINS`, `ALLOWED_HOSTS` (hostnames da API, sem `*`), `ACCESS_TOKEN_EXPIRE_MINUTES` entre **1 e 30** em produção, `ENVIRONMENT=production`. Opcional: `GUNICORN_FORWARDED_ALLOW_IPS` se o reverse proxy não for `127.0.0.1`. Para o primeiro admin após `python -m app.seed`, defina `SEED_ADMIN_PASSWORD` (mín. 8 caracteres); sem isso o seed em produção não cria usuário admin padrão.  
 - Subir: `docker compose -f docker-compose.prod.yml up -d --build`  
 - Desenvolvimento local continua com `docker compose up` (API com `--reload` e banco `db` no compose).
 

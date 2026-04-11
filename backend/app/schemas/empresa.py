@@ -87,6 +87,28 @@ class EmpresaRead(EmpresaBase):
         from_attributes = True
 
 
+class RedeListaResumo(BaseModel):
+    """Nome da rede para listagens com minimização de dados (não-admin)."""
+
+    id: int
+    nome: str
+
+    class Config:
+        from_attributes = True
+
+
+class EmpresaListaResumo(BaseModel):
+    """Lista paginada para atendentes: identificação + rede, sem CNPJ/endereço/PII."""
+
+    id: int
+    nome: str
+    ativo: bool
+    rede: RedeListaResumo
+
+    class Config:
+        from_attributes = True
+
+
 class ConsultaCNPJResponse(BaseModel):
     """Resposta normalizada da consulta ReceitaWS para preenchimento do formulário."""
     cnpj: str

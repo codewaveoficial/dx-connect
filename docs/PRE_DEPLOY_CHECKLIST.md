@@ -57,6 +57,13 @@ Legenda: **OK** atendido no repositório | **Você** validação manual no servi
 | `SECRET_KEY` fora do repositório | **OK** — só no `.env` do servidor / CI. |
 | `DEBUG=False` validado em produção | **OK** — `DEBUG=true` + `ENVIRONMENT=production` falha na validação. |
 | Rotas sensíveis sem controle | **Parcial** — `/docs` e OpenAPI **desligados** quando `ENVIRONMENT=production`; demais rotas seguem auth nas próprias rotas. |
+| JWT: sessão curta em produção | **OK** — `ACCESS_TOKEN_EXPIRE_MINUTES` máximo **30** com `ENVIRONMENT=production`. |
+| `DATABASE_URL` com TLS ao PostgreSQL | **OK** — em produção a URL deve incluir `sslmode=require` (ou `verify-full` / `ssl=true`). **Você** confere no painel do provedor. |
+| Header `Host` (cache poisoning) | **OK** — `TrustedHostMiddleware` quando `ALLOWED_HOSTS` ≠ `*` (obrigatório em produção). |
+| Gunicorn `forwarded_allow_ips` | **OK** — padrão `127.0.0.1`; ajuste `GUNICORN_FORWARDED_ALLOW_IPS` se o proxy não for localhost. |
+| Telas só admin no frontend | **OK** — `AdminRoute` exibe página 403 para não-admin (defesa em profundidade além da API). |
+| XSS / dependências JS | **Você** — `npm audit` no frontend; CSP no Nginx; token em storage continua sensível a XSS até eventual refresh em cookie httpOnly. |
+| CI + Dependabot no GitHub | **OK** — `.github/workflows/ci.yml` e `.github/dependabot.yml` (se usar outro Git, replique os passos manualmente). |
 
 ---
 

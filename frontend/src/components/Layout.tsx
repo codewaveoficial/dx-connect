@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Sidebar } from './Sidebar'
 import { ThemeToggle } from './ThemeToggle'
@@ -12,8 +12,13 @@ const menuIcon = (
 
 export function Layout() {
   const { user, logout, isAdmin } = useAuth()
+  const location = useLocation()
   const [sidebarExpanded, setSidebarExpanded] = useState(true)
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false)
+
+  if (user?.must_change_password && location.pathname !== '/alterar-senha') {
+    return <Navigate to="/alterar-senha" replace />
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/90 dark:from-slate-950 dark:to-slate-900/95">

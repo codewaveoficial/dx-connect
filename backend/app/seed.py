@@ -3,6 +3,7 @@ from sqlalchemy import func
 
 import bcrypt
 
+from app.config import settings
 from app.database import SessionLocal
 from app.models import StatusTicket, Atendente
 
@@ -50,15 +51,42 @@ def run_seed():
             _ensure_status_aguardando_atendimento(db)
 
         if db.query(Atendente).filter(func.lower(Atendente.email) == "admin@email.com").count() == 0:
-            db.add(Atendente(
-                email="admin@email.com",
-                nome="Administrador",
-                senha_hash=_hash_senha("admin123"),
-                role="admin",
-                ativo=True,
-            ))
-            db.commit()
-            print("Usuário admin criado: admin@email.com / admin123")
+            if settings.is_production:
+                pwd = (settings.SEED_ADMIN_PASSWORD or "").strip()
+                if len(pwd) < 8:
+                    print(
+                        "Produção: admin inicial não criado. Defina SEED_ADMIN_PASSWORD (mín. 8 caracteres) "
+                        "no ambiente ou crie o administrador pelo painel após o primeiro deploy."
+                    )
+                else:
+                    db.add(
+                        Atendente(
+                            email="admin@email.com",
+                            nome="Administrador",
+                            senha_hash=_hash_senha(pwd),
+                            role="admin",
+                            ativo=True,
+                            must_change_password=True,
+                        )
+                    )
+                    db.commit()
+                    print(
+                        "Usuário admin criado: admin@email.com — troque a senha no primeiro acesso "
+                        "(must_change_password ativo)."
+                    )
+            else:
+                db.add(
+                    Atendente(
+                        email="admin@email.com",
+                        nome="Administrador",
+                        senha_hash=_hash_senha("admin123"),
+                        role="admin",
+                        ativo=True,
+                        must_change_password=False,
+                    )
+                )
+                db.commit()
+                print("Usuário admin criado (desenvolvimento): admin@email.com / admin123 — não use em produção.")
     finally:
         db.close()
 

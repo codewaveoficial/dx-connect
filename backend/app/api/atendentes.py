@@ -7,11 +7,11 @@ from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from app.core.ordenacao_lista import OrdemLista, expr_ordem
 from app.models import Atendente, Setor
-from app.schemas.atendente import AtendenteCreate, AtendenteRead, AtendenteUpdate
+from app.schemas.atendente import AtendenteCreate, AtendenteRead, AtendenteUpdate, TrocaSenhaPropria
 from app.schemas.lista_paginada import ListaPaginada
 from app.core.auth import exigir_admin, obter_atendente_atual
 from app.core.setor_scope import ids_setores_mesmo_nome, ids_setores_visiveis_atendente
-from app.core.security import hash_senha
+from app.core.security import hash_senha, verificar_senha
 from app.core.audit import registrar_audit
 
 router = APIRouter(prefix="/atendentes", tags=["atendentes"])
@@ -37,6 +37,7 @@ def _atendente_para_read(atendente: Atendente) -> AtendenteRead:
         created_at=atendente.created_at,
         updated_at=atendente.updated_at,
         setor_ids=[s.id for s in atendente.setores],
+        must_change_password=bool(getattr(atendente, "must_change_password", False)),
     )
 
 
@@ -110,6 +111,26 @@ def me(atendente: Atendente = Depends(obter_atendente_atual)):
     return _atendente_para_read(atendente)
 
 
+@router.post("/me/trocar-senha", response_model=AtendenteRead)
+def trocar_senha_propria(
+    data: TrocaSenhaPropria,
+    db: Session = Depends(get_db),
+    atendente: Atendente = Depends(obter_atendente_atual),
+):
+    if not verificar_senha(data.senha_atual, atendente.senha_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Senha atual incorreta.")
+    if data.senha_atual == data.senha_nova:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A nova senha deve ser diferente da senha atual.",
+        )
+    atendente.senha_hash = hash_senha(data.senha_nova)
+    atendente.must_change_password = False
+    db.commit()
+    db.refresh(atendente)
+    return _atendente_para_read(atendente)
+
+
 @router.get("/por-setor/{setor_id}", response_model=list[AtendenteRead])
 def listar_atendentes_por_setor(
     setor_id: int,
@@ -162,6 +183,7 @@ def atualizar_atendente(
     update = data.model_dump(exclude_unset=True)
     if "senha" in update and update["senha"]:
         atendente.senha_hash = hash_senha(update.pop("senha"))
+        atendente.must_change_password = False
     if "setor_ids" in update:
         setor_ids = update.pop("setor_ids")
         atendente.setores.clear()

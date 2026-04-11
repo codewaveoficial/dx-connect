@@ -371,7 +371,7 @@ export function RedeDetalhe() {
     Promise.all([
       redes.get(redeId),
       coletarTodasPaginas<Empresas.Empresa>((o, l) =>
-        empresas.list({ rede_id: redeId, incluir_inativos: true, offset: o, limit: l }),
+        empresas.list<Empresas.Empresa>({ rede_id: redeId, incluir_inativos: true, offset: o, limit: l }),
       ),
     ])
       .then(([r, e]) => {
@@ -393,7 +393,7 @@ export function RedeDetalhe() {
     Promise.all([
       redes.get(redeId),
       coletarTodasPaginas<Empresas.Empresa>((o, l) =>
-        empresas.list({ rede_id: redeId, incluir_inativos: true, offset: o, limit: l }),
+        empresas.list<Empresas.Empresa>({ rede_id: redeId, incluir_inativos: true, offset: o, limit: l }),
       ),
     ])
       .then(([r, e]) => {

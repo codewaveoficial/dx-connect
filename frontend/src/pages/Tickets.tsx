@@ -52,7 +52,7 @@ export function Tickets() {
   const [filtroEmpresa, setFiltroEmpresa] = useState<number | ''>('')
   const [filtroSetor, setFiltroSetor] = useState<number | ''>('')
   const [statusList, setStatusList] = useState<StatusTicket.Status[]>([])
-  const [empresasOpt, setEmpresasOpt] = useState<Empresas.Empresa[]>([])
+  const [empresasOpt, setEmpresasOpt] = useState<Empresas.EmpresaListaItem[]>([])
   const [setoresOpt, setSetoresOpt] = useState<Setores.Setor[]>([])
   const [atendentesOpt, setAtendentesOpt] = useState<Atendentes.Atendente[]>([])
   /** '' | 'sem_responsavel' | 'meus' — fila do setor vs. atribuídos a mim */
@@ -115,7 +115,9 @@ export function Tickets() {
     coletarTodasPaginas<StatusTicket.Status>((o, l) =>
       statusTicket.list({ incluir_inativos: false, offset: o, limit: l }),
     ).then(setStatusList)
-    coletarTodasPaginas<Empresas.Empresa>((o, l) => empresas.list({ offset: o, limit: l })).then(setEmpresasOpt)
+    coletarTodasPaginas<Empresas.EmpresaListaItem>((o, l) => empresas.list({ offset: o, limit: l })).then(
+      setEmpresasOpt,
+    )
     coletarTodasPaginas<Setores.Setor>((o, l) =>
       setores.list({ incluir_inativos: true, offset: o, limit: l }),
     ).then(setSetoresOpt)

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
 
 
@@ -31,6 +31,7 @@ class AtendenteRead(AtendenteBase):
     created_at: datetime | None = None
     updated_at: datetime | None = None
     setor_ids: list[int] = []
+    must_change_password: bool = False
 
     class Config:
         from_attributes = True
@@ -46,3 +47,9 @@ class AtendenteLogin(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    must_change_password: bool = False
+
+
+class TrocaSenhaPropria(BaseModel):
+    senha_atual: str = Field(..., min_length=1)
+    senha_nova: str = Field(..., min_length=8, max_length=128)

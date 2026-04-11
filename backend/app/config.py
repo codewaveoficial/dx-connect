@@ -1,3 +1,4 @@
+import re
 from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
@@ -21,6 +22,7 @@ class Settings(BaseSettings):
         description="Chave JWT; em produção use 32+ caracteres aleatórios (ex.: openssl rand -hex 32).",
     )
     ALGORITHM: str = "HS256"
+    # Em produção o validador exige no máximo 30 (sessão curta; mitiga vazamento de token).
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     # Origens CORS separadas por vírgula (ex.: https://app.exemplo.com,https://www.exemplo.com)
     CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
@@ -28,6 +30,12 @@ class Settings(BaseSettings):
     # Cache de municípios (IBGE): intervalo entre verificações em background e idade máxima antes de re-sync completo.
     IBGE_MUNICIPIOS_SYNC_INTERVAL_SECONDS: int = 86400
     IBGE_MUNICIPIOS_MAX_AGE_HOURS: int = 168
+    # Seed em produção: se definido, cria admin@email.com com esta senha e must_change_password=true.
+    # Sem isso, run_seed não cria usuário admin padrão em ENVIRONMENT=production.
+    SEED_ADMIN_PASSWORD: str | None = None
+    # Hostnames permitidos no header Host (TrustedHostMiddleware). Em produção não use "*".
+    # Ex.: api.seudominio.com,127.0.0.1
+    ALLOWED_HOSTS: str = "*"
 
     @field_validator("LOG_LEVEL")
     @classmethod
@@ -52,14 +60,44 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "CORS_ORIGINS deve listar ao menos a origem HTTPS do frontend em produção"
                 )
+            if self.ACCESS_TOKEN_EXPIRE_MINUTES > 30:
+                raise ValueError(
+                    "Em produção ACCESS_TOKEN_EXPIRE_MINUTES deve ser no máximo 30 (política de sessão curta)."
+                )
+            hosts = self.allowed_hosts_list()
+            if not hosts or hosts == ["*"]:
+                raise ValueError(
+                    "Em produção defina ALLOWED_HOSTS com os hostnames que o Nginx/proxy usa "
+                    "(ex.: api.seudominio.com,127.0.0.1), não *."
+                )
+            if not _database_url_exige_ssl(self.DATABASE_URL):
+                raise ValueError(
+                    "Em produção DATABASE_URL (PostgreSQL) deve exigir TLS "
+                    "(ex.: ?sslmode=require ou sslmode=verify-full na URL)."
+                )
         return self
 
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
 
+    def allowed_hosts_list(self) -> list[str]:
+        return [h.strip() for h in self.ALLOWED_HOSTS.split(",") if h.strip()]
+
     @property
     def is_production(self) -> bool:
         return self.ENVIRONMENT == "production"
+
+
+def _database_url_exige_ssl(database_url: str) -> bool:
+    """True se a URL PostgreSQL indica TLS (sslmode ou ssl=true na query)."""
+    u = database_url.strip().lower()
+    if not u.startswith(("postgresql://", "postgres://")):
+        return False
+    if "sslmode=require" in u or "sslmode=verify-full" in u or "sslmode=verify-ca" in u:
+        return True
+    if re.search(r"[&?]ssl=true\b", u):
+        return True
+    return False
 
 
 settings = Settings()

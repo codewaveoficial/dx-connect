@@ -1,6 +1,10 @@
 # API FastAPI (Gunicorn na porta interna 8000).
 # Uso: copie para o VPS, ajuste server_name, teste com sudo nginx -t e recarregue o Nginx.
 #
+# Opcional: endurecer POST /v1/auth/login (complementa o rate limit na API)
+#   limit_req_zone $binary_remote_addr zone=dx_login:10m rate=15r/m;
+#   location = /v1/auth/login { limit_req zone=dx_login burst=5 nodelay; ... proxy_pass ... }
+#
 # sudo cp api.http.conf.example /etc/nginx/sites-available/dx-connect-api
 # sudo ln -sf /etc/nginx/sites-available/dx-connect-api /etc/nginx/sites-enabled/
 # sudo nginx -t && sudo systemctl reload nginx

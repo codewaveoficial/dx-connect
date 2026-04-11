@@ -9,5 +9,6 @@ worker_class = "uvicorn.workers.UvicornWorker"
 accesslog = "-"
 errorlog = "-"
 capture_output = True
-# Atrás de reverse proxy (nginx, painel): confiar em X-Forwarded-* .
-forwarded_allow_ips = "*"
+# IPs do reverse proxy autorizados a enviar X-Forwarded-For / Proto. Não use "*" em produção.
+# Docker: pode ser necessário incluir o gateway da bridge (ex.: 172.17.0.1) — defina GUNICORN_FORWARDED_ALLOW_IPS.
+forwarded_allow_ips = os.environ.get("GUNICORN_FORWARDED_ALLOW_IPS", "127.0.0.1")

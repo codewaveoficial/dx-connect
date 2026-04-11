@@ -17,7 +17,7 @@ export function TicketNovo() {
   const navigate = useNavigate()
   const voltarAnterior = useVoltarAnterior('/tickets')
 
-  const [empresasList, setEmpresasList] = useState<Empresas.Empresa[]>([])
+  const [empresasList, setEmpresasList] = useState<Empresas.EmpresaListaItem[]>([])
   const [setoresList, setSetoresList] = useState<Setores.Setor[]>([])
   const [empresaId, setEmpresaId] = useState<number | ''>('')
   const [setorId, setSetorId] = useState<number | ''>('')
@@ -43,13 +43,15 @@ export function TicketNovo() {
       empresasList.map((e) => ({
         id: e.id,
         label: e.nome,
-        createdAt: e.created_at,
+        createdAt: 'created_at' in e ? e.created_at : undefined,
       })),
     [empresasList],
   )
 
   useEffect(() => {
-    coletarTodasPaginas<Empresas.Empresa>((o, l) => empresas.list({ offset: o, limit: l })).then(setEmpresasList)
+    coletarTodasPaginas<Empresas.EmpresaListaItem>((o, l) => empresas.list({ offset: o, limit: l })).then(
+      setEmpresasList,
+    )
     coletarTodasPaginas<Setores.Setor>((o, l) =>
       setores.list({ incluir_inativos: true, offset: o, limit: l }),
     ).then(setSetoresList)

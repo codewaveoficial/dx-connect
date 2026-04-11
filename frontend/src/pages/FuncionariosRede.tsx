@@ -89,7 +89,7 @@ export function FuncionariosRede() {
       setRedesList,
     )
     coletarTodasPaginas<Empresas.Empresa>((o, l) =>
-      empresas.list({ incluir_inativos: true, offset: o, limit: l }),
+      empresas.list<Empresas.Empresa>({ incluir_inativos: true, offset: o, limit: l }),
     ).then(setEmpresasList)
   }, [])
 

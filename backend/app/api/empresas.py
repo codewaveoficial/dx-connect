@@ -6,13 +6,20 @@ from enum import Enum
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, contains_eager
 
 from app.database import get_db
 from app.core.ordenacao_lista import OrdemLista, expr_ordem
 from app.models import Empresa, Rede, Ticket, FuncionarioRede, FuncionarioRedeEmpresa
 from app.models.atendente import Atendente
-from app.schemas.empresa import EmpresaCreate, EmpresaUpdate, EmpresaRead, ConsultaCNPJResponse
+from app.schemas.empresa import (
+    EmpresaCreate,
+    EmpresaUpdate,
+    EmpresaRead,
+    ConsultaCNPJResponse,
+    EmpresaListaResumo,
+    RedeListaResumo,
+)
 from app.schemas.lista_paginada import ListaPaginada
 from app.core.auth import exigir_admin, obter_atendente_atual
 from app.core.audit import registrar_audit
@@ -31,18 +38,7 @@ class OrdenarEmpresasPor(str, Enum):
     ativo = "ativo"
 
 
-def _pode_ver_empresa(atendente: Atendente, empresa_id: int, db: Session) -> bool:
-    if atendente.role == "admin":
-        return True
-    setor_ids = [s.id for s in atendente.setores]
-    # Atendente vê empresa se existir ticket da empresa no seu setor (ou filtramos por empresa nos tickets)
-    # Na prática: admin vê todas; atendente vê empresas que têm tickets no seu setor.
-    # Para listar empresas: admin vê todas; atendente pode ver apenas "suas" empresas (onde tem ticket).
-    # Simplificando: apenas admin gerencia empresas. Atendente não lista empresas diretamente.
-    return False
-
-
-@router.get("", response_model=ListaPaginada[EmpresaRead])
+@router.get("", response_model=ListaPaginada[EmpresaRead] | ListaPaginada[EmpresaListaResumo])
 def listar_empresas(
     rede_id: int | None = Query(None),
     incluir_inativos: bool = Query(False, description="Incluir empresas inativas"),
@@ -52,8 +48,10 @@ def listar_empresas(
     ordenar_por: OrdenarEmpresasPor | None = Query(None),
     ordem: OrdemLista = Query(OrdemLista.asc),
     db: Session = Depends(get_db),
-    _: Atendente = Depends(obter_atendente_atual),
+    atendente: Atendente = Depends(obter_atendente_atual),
 ):
+    """Admin: modelo completo. Atendente: apenas id, nome, rede e ativo (minimização de PII)."""
+    admin = atendente.role == "admin"
     q = db.query(Empresa)
     if rede_id is not None:
         q = q.filter(Empresa.rede_id == rede_id)
@@ -73,20 +71,45 @@ def listar_empresas(
     total = q.count()
     if ordenar_por is None:
         order_cols = [Empresa.nome.asc(), Empresa.id.asc()]
+        if not admin:
+            q = q.options(joinedload(Empresa.rede))
     else:
         if ordenar_por == OrdenarEmpresasPor.rede:
             q = q.join(Empresa.rede)
+            if not admin:
+                q = q.options(contains_eager(Empresa.rede))
             primary = expr_ordem(Rede.nome, ordem)
         elif ordenar_por == OrdenarEmpresasPor.nome:
+            if not admin:
+                q = q.options(joinedload(Empresa.rede))
             primary = expr_ordem(Empresa.nome, ordem)
         elif ordenar_por == OrdenarEmpresasPor.cnpj_cpf:
+            if not admin:
+                q = q.options(joinedload(Empresa.rede))
             primary = expr_ordem(Empresa.cnpj_cpf, ordem)
         elif ordenar_por == OrdenarEmpresasPor.cidade:
+            if not admin:
+                q = q.options(joinedload(Empresa.rede))
             primary = expr_ordem(Empresa.cidade, ordem)
         else:
+            if not admin:
+                q = q.options(joinedload(Empresa.rede))
             primary = expr_ordem(Empresa.ativo, ordem)
         order_cols = [primary, expr_ordem(Empresa.id, ordem)]
     items = q.order_by(*order_cols).offset(offset).limit(limit).all()
+    if not admin:
+        resumos: list[EmpresaListaResumo] = []
+        for e in items:
+            r = e.rede
+            resumos.append(
+                EmpresaListaResumo(
+                    id=e.id,
+                    nome=e.nome,
+                    ativo=e.ativo,
+                    rede=RedeListaResumo(id=r.id, nome=r.nome) if r else RedeListaResumo(id=e.rede_id, nome=""),
+                )
+            )
+        return ListaPaginada(items=resumos, total=total)
     return ListaPaginada(items=items, total=total)
 
 

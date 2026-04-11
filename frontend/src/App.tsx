@@ -18,6 +18,8 @@ import { FuncionarioRedeDetalhe } from './pages/FuncionarioRedeDetalhe'
 import { StatusTicketPage } from './pages/StatusTicket'
 import { Auditoria } from './pages/Auditoria'
 import { TiposNegocio } from './pages/TiposNegocio'
+import { AlterarSenha } from './pages/AlterarSenha'
+import { AcessoNegado } from './pages/AcessoNegado'
 import { ToastProvider } from './components/ui/Toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
@@ -36,6 +38,24 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <span className="text-slate-500 dark:text-slate-400">Carregando...</span>
+      </div>
+    )
+  }
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+  if (user.role !== 'admin') {
+    return <AcessoNegado />
+  }
+  return <>{children}</>
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -49,20 +69,98 @@ function AppRoutes() {
         }
       >
         <Route index element={<Dashboard />} />
+        <Route path="alterar-senha" element={<AlterarSenha />} />
         <Route path="tickets" element={<Tickets />} />
         <Route path="tickets/novo" element={<TicketNovo />} />
         <Route path="tickets/:id" element={<TicketDetalhe />} />
-        <Route path="redes/:id" element={<RedeDetalhe />} />
-        <Route path="redes" element={<Redes />} />
-        <Route path="empresas/:id" element={<EmpresaDetalhe />} />
-        <Route path="empresas" element={<Empresas />} />
-        <Route path="setores" element={<Setores />} />
-        <Route path="atendentes" element={<Atendentes />} />
-        <Route path="funcionarios-rede/:id" element={<FuncionarioRedeDetalhe />} />
-        <Route path="funcionarios-rede" element={<FuncionariosRede />} />
-        <Route path="status-ticket" element={<StatusTicketPage />} />
-        <Route path="auditoria" element={<Auditoria />} />
-        <Route path="tipos-negocio" element={<TiposNegocio />} />
+        <Route
+          path="redes/:id"
+          element={
+            <AdminRoute>
+              <RedeDetalhe />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="redes"
+          element={
+            <AdminRoute>
+              <Redes />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="empresas/:id"
+          element={
+            <AdminRoute>
+              <EmpresaDetalhe />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="empresas"
+          element={
+            <AdminRoute>
+              <Empresas />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="setores"
+          element={
+            <AdminRoute>
+              <Setores />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="atendentes"
+          element={
+            <AdminRoute>
+              <Atendentes />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="funcionarios-rede/:id"
+          element={
+            <AdminRoute>
+              <FuncionarioRedeDetalhe />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="funcionarios-rede"
+          element={
+            <AdminRoute>
+              <FuncionariosRede />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="status-ticket"
+          element={
+            <AdminRoute>
+              <StatusTicketPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="auditoria"
+          element={
+            <AdminRoute>
+              <Auditoria />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="tipos-negocio"
+          element={
+            <AdminRoute>
+              <TiposNegocio />
+            </AdminRoute>
+          }
+        />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

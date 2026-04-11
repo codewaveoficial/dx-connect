@@ -1,0 +1,109 @@
+# Deploy: build do frontend no GitHub + rsync para o VPS + git pull + Alembic + Docker Compose.
+#
+# Secrets (Settings → Secrets and variables → Actions):
+#   DEPLOY_HOST           — hostname ou IP do VPS
+#   DEPLOY_USER           — usuário SSH
+#   DEPLOY_SSH_KEY        — chave privada OpenSSH completa
+#   DEPLOY_PATH           — clone do repositório no servidor (ex.: /home/deploy/dx-connect)
+#   DEPLOY_FRONTEND_DIST  — pasta onde o Nginx aponta o root do SPA (conteúdo de frontend/dist)
+#   VITE_API_URL          — URL HTTPS da API (sem barra final)
+# Opcional:
+#   DEPLOY_SSH_PORT       — porta SSH (padrão 22)
+#   DEPLOY_GIT_REF        — branch (padrão main)
+#
+# Opcional: crie um Environment "production" com estes secrets e descomente "environment: production" abaixo.
+
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_migrations:
+        description: "Não executar alembic upgrade (só em situações excepcionais)"
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "docker-compose.prod.yml"
+      - ".github/workflows/deploy.yml"
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # environment: production
+
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      DEPLOY_FRONTEND_DIST: ${{ secrets.DEPLOY_FRONTEND_DIST }}
+      VITE_API_URL: ${{ secrets.VITE_API_URL }}
+      SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT }}
+      DEPLOY_GIT_REF: ${{ secrets.DEPLOY_GIT_REF }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      # workflow_dispatch: checkbox; push: primeiro termo é false (short-circuit, não avalia inputs)
+      SKIP_MIGRATIONS: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_migrations == true || false }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build do frontend
+        working-directory: frontend
+        run: |
+          if [ -z "${VITE_API_URL:-}" ]; then
+            echo "::error::Defina o secret VITE_API_URL (URL HTTPS da API, sem barra no final)."
+            exit 1
+          fi
+          npm ci
+          npm run build
+
+      - name: Validar secrets de deploy
+        run: |
+          if [ -z "${DEPLOY_HOST:-}" ] || [ -z "${DEPLOY_USER:-}" ] || [ -z "${DEPLOY_PATH:-}" ] || [ -z "${DEPLOY_FRONTEND_DIST:-}" ]; then
+            echo "::error::Defina DEPLOY_HOST, DEPLOY_USER, DEPLOY_PATH e DEPLOY_FRONTEND_DIST."
+            exit 1
+          fi
+          if [ -z "${DEPLOY_SSH_KEY:-}" ]; then
+            echo "::error::Defina DEPLOY_SSH_KEY."
+            exit 1
+          fi
+
+      - name: SSH — known_hosts e chave
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          P="${SSH_PORT:-22}"
+          ssh-keyscan -p "$P" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          echo "SSH_PORT=${P}" >> "$GITHUB_ENV"
+
+      - name: Rsync — frontend dist → VPS
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new -p ${SSH_PORT}" \
+            frontend/dist/ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_FRONTEND_DIST}/"
+
+      - name: Git pull + Alembic + Docker Compose
+        run: |
+          REF="${DEPLOY_GIT_REF:-main}"
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new -p "${SSH_PORT}" \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" bash -s << EOF
+          set -e
+          cd "${DEPLOY_PATH}"
+          git fetch origin
+          git checkout "${REF}"
+          git pull origin "${REF}"
+          if [ "${SKIP_MIGRATIONS}" != "true" ]; then
+            docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
+          fi
+          docker compose -f docker-compose.prod.yml up -d --build
+          EOF
